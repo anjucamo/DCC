@@ -1,6 +1,6 @@
-
 import React from "react";
 import { User } from "../types";
+import logo3 from "../assets/logo3.1.png"; // 👈 usamos logo3
 
 export function AppHeader({
   currentUser,
@@ -12,18 +12,23 @@ export function AppHeader({
   return (
     <header className="app-header">
       <div className="container header-grid">
-        <div className="brand">DCC</div>
-        <div style={{ flex: 1 }} />
-        {currentUser && (
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            <span>
-              {currentUser.name} — {String(currentUser.role).toUpperCase()}
-            </span>
-            <button className="btn" onClick={onLogout}>
-              Salir
-            </button>
-          </div>
-        )}
+        <div className="brand">
+          <img src={logo3} alt="Digital Contact Center Colombia" />
+          <span>DIGITAL CONTACT CENTER S.A.S</span>
+        </div>
+
+        <div className="header-actions">
+          {currentUser && (
+            <>
+              <span>
+                {currentUser.name} — {String(currentUser.role).toUpperCase()}
+              </span>
+              <button className="btn" onClick={onLogout}>
+                Salir
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );

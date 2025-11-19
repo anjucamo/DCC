@@ -1,8 +1,10 @@
-
+// src/pages/LoginEnhanced.tsx
 import React from "react";
 import { supabase } from "../lib/supabase";
 import { User } from "../types";
-import logo from "../assets/logo.png"; // Assuming logo.png is still the preferred logo
+import logo from "../assets/logo.png";
+import logo3 from "../assets/logo3.png";
+
 
 export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
   const [cedula, setCedula] = React.useState("");
@@ -10,17 +12,18 @@ export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      // Llama a tu función de Supabase por CÉDULA
+      // Llamada a la función de Supabase por CÉDULA
       const { data, error } = await supabase.rpc("app_login_cedula", {
         p_cedula: cedula,
         p_password: password,
       });
+
       if (error) throw new Error(error.message);
 
       const row: any = Array.isArray(data) ? data[0] : data;
@@ -44,17 +47,48 @@ export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
     }
   };
 
-  return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <img src={logo} alt="DCC" className="auth-logo" />
-          <h2>Bienvenido de nuevo</h2>
-          <p>Ingresa tus credenciales para continuar</p>
+ return (
+  <div className="auth">
+    <div className="auth-card">
+      {/* Columna izquierda (solo texto, sin logo) */}
+     <div className="auth-left">
+  <div className="brand">
+
+    <img src={logo3} alt="Digital Contact Center Colombia" />
+    
+   
+  </div>
+
+  <div className="auth-left-footer">
+    <div className="dots">
+      <span className="dot y" />
+      <span className="dot b" />
+      <span className="dot r" />
+    </div>
+    <span>
+      © {new Date().getFullYear()} DCC Colombia. Todos los derechos
+      reservados.
+    </span>
+  </div>
+</div>
+
+
+      {/* Columna derecha (logo + formulario, como antes) */}
+      <div className="auth-right">
+        <div className="auth-logo">
+          <img src={logo} alt="Digital Contact Center Colombia" />
         </div>
+
+        <h1 className="auth-title">Bienvenido de nuevo</h1>
+        <p className="auth-subtitle">
+          Ingresa tus credenciales para continuar
+        </p>
+
         <form className="auth-form" onSubmit={submit}>
-          <div className="form-group">
-            <label htmlFor="cedula">Cédula</label>
+          <div>
+            <label className="label" htmlFor="cedula">
+              Cédula
+            </label>
             <input
               id="cedula"
               className="input"
@@ -64,8 +98,11 @@ export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
               placeholder="Solo números"
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Contraseña</label>
+
+          <div>
+            <label className="label" htmlFor="password">
+              Contraseña
+            </label>
             <input
               id="password"
               className="input"
@@ -80,12 +117,14 @@ export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
 
           <button
             className="btn primary auth-button"
-            disabled={loading}
+            disabled={loading || !cedula || !password}
           >
             {loading ? "Ingresando..." : "Entrar"}
           </button>
         </form>
       </div>
     </div>
-  );
+  </div>
+);
+
 }
