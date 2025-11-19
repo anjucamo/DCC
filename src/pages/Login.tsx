@@ -2,7 +2,7 @@
 import React from "react";
 import { supabase } from "../lib/supabase";
 import { User } from "../types";
-import logo from "../assets/logo.PNG";
+import logo from "../assets/logo.png";
 
 export function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [cedula, setCedula] = React.useState("");

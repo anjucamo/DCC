@@ -868,6 +868,8 @@ td.obs{
   align-items: center;
   min-height: 100vh;
   background-color: #f3f4f6;
+  overflow-y: auto;
+  padding: 2rem;
 }
 
 .auth-card {
