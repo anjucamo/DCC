@@ -1,7 +1,7 @@
 import React from "react";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { Sale, User } from "./types";
-import { Login } from "./pages/Login";
+import { LoginEnhanced } from "./pages/LoginEnhanced";
 import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
@@ -24,9 +24,9 @@ export default function App() {
 
   return (
     <div>
-      <AppHeader currentUser={currentUser} onLogout={logout} />
+      {currentUser && <AppHeader currentUser={currentUser} onLogout={logout} />}
       {!currentUser ? (
-        <Login onLogin={setCurrentUser} />
+        <LoginEnhanced onLogin={setCurrentUser} />
       ) : currentUser.role === "asesor" ? (
         <AsesorView
           user={currentUser}

@@ -863,12 +863,10 @@ td.obs{
 }
 
 .auth-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: grid;
+  place-items: center;
   min-height: 100vh;
   background-color: #f3f4f6;
-  overflow-y: auto;
   padding: 2rem;
 }
 
@@ -952,4 +950,5 @@ td.obs{
   background-color: #9ca3af;
   cursor: not-allowed;
 }
+
 
