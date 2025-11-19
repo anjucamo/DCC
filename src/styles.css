@@ -1,0 +1,108 @@
+/* ====== Layout base ====== */
+.app-header { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 1px solid var(--g200); }
+.header-grid { display:flex; align-items:center; height:88px; gap:12px; }
+.header-actions { margin-left:auto; display:flex; align-items:center; gap:8px; }
+
+/* Filas adaptativas */
+.row { display:grid; gap:12px; }
+.row.one { grid-template-columns: 1fr; }
+.row.two { grid-template-columns: 2fr 1fr; }
+.row.auto-3 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.responsive-gap { gap: 12px; }
+
+/* Grids utilitarias */
+.grid-2 { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+.field-row { display:grid; grid-template-columns: repeat(var(--cols, 2), minmax(0,1fr)); gap:12px; }
+
+/* Controles */
+.select-wrap { position:relative; }
+.select-caret { position:absolute; right:10px; top:12px; pointer-events:none; color:#6b7280; }
+
+/* KPI meta */
+.kpi-meta { text-align:right; margin-top:-12px; }
+.kpi-meta-strong { font-weight:800; font-size:18px; }
+.kpi-meta-dim { color:#6b7280; }
+
+/* Charts */
+.chart { width:100%; }
+.chart.h-220 { height:220px; }
+.chart.h-280 { height:280px; }
+.chart.h-330 { height:330px; }
+
+/* Filtros */
+.filters-header { display:flex; align-items:center; justify-content:space-between; }
+.filters-title { display:inline-flex; align-items:center; gap:8px; }
+.filters-grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:12px; }
+.filters-grid .span-2 { grid-column: span 2 / span 2; }
+
+/* Cabecera de tarjeta "Mis ventas" */
+.card-header-flex { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.card-header-actions { display:flex; align-items:center; gap:8px; }
+.filter-mini { width:220px; }
+
+/* Botoneras compactas */
+.btn-row { display:flex; flex-wrap:wrap; gap:8px; }
+.flex-row { display:flex; gap:8px; margin-top:12px; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,.6);
+  display: grid; place-items: center; z-index: 1000; padding: 16px;
+}
+.modal-card { width:100%; border-radius:16px; max-height: calc(100vh - 32px); display:flex; flex-direction:column; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; }
+.modal-body { overflow:auto; }
+.modal-actions { display:flex; justify-content:space-between; margin-top:16px; }
+.form-msg { color:#065f46; font-size:14px; margin-top:8px; }
+
+/* Secciones detalle */
+.section { border:1px solid var(--g200); border-radius:12px; padding:12px; }
+.section-title { font-weight:700; margin-bottom:8px; }
+.kv { display:grid; gap:4px; }
+.kv-label { font-size:12px; color:#6b7280; }
+.kv-value { font-weight:600; }
+.obs-list { margin:0; padding-left:18px; }
+
+/* Tabla apilable en móvil */
+.table-wrap { width:100%; overflow-x:auto; }
+.table-empty { font-size:14px; color:#6b7280; margin-top:8px; }
+table.stack { width:100%; border-collapse:collapse; }
+table.stack th, table.stack td { padding:8px 10px; border-top:1px solid var(--g200); text-align:left; }
+table.stack thead th { background:#f8fafc; font-weight:700; }
+
+/* ====== BREAKPOINTS ====== */
+@media (max-width: 1024px) {
+  .row.two { grid-template-columns: 1fr; }
+  .filters-grid { grid-template-columns: repeat(3, 1fr); }
+  .filters-grid .span-2 { grid-column: span 3 / span 3; }
+  .chart.h-330 { height:300px; }
+}
+
+@media (max-width: 768px) {
+  .header-grid { height:72px; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+  .filters-grid { grid-template-columns: repeat(2, 1fr); }
+  .filters-grid .span-2 { grid-column: span 2 / span 2; }
+  .filter-mini { width:100%; }
+  .chart.h-280 { height:230px; }
+  .chart.h-330 { height:260px; }
+
+  /* Tabla "stack" */
+  table.stack thead { display:none; }
+  table.stack tr { display:block; padding:10px; border:1px solid var(--g200); border-radius:12px; margin-bottom:10px; }
+  table.stack td { display:flex; justify-content:space-between; align-items:center; border:none; padding:6px 4px; }
+  table.stack td::before {
+    content: attr(data-label);
+    font-weight:600; color:#6b7280; margin-right:10px; text-align:left;
+  }
+  .btn-row { justify-content:flex-end; }
+}
+
+@media (max-width: 480px) {
+  .auto-3 { grid-template-columns: 1fr; }
+  .chart.h-220 { height:180px; }
+  .chart.h-280 { height:200px; }
+  .chart.h-330 { height:220px; }
+  .modal-card { max-height: calc(100vh - 20px); }
+}

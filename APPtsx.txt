@@ -1,0 +1,1713 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ResponsiveContainer, PieChart, Pie, Cell,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  BarChart, Bar,
+} from "recharts";
+import {
+  LogOut, ClipboardList, CheckCircle2, XCircle, Filter, ChevronDown, Edit3, Plus,
+} from "lucide-react";
+
+import { supabase } from './lib/supabase';
+
+import "./app.css";
+
+
+/** ================== Tipos ================== */
+type Role = "asesor"|"back"|"admin";
+type User = { id:string; role:Role; name:string; email:string; password:string; sala:string };
+
+
+
+export function Login({ onLogin }:{ onLogin:(u:User)=>void }) {
+  const [cedula,setCedula]   = React.useState("");
+  const [password,setPassword] = React.useState("");
+  const [loading,setLoading] = React.useState(false);
+  const [error,setError]     = React.useState<string | null>(null);
+
+  const submit = async (e:React.FormEvent) => {
+    e.preventDefault(); setError(null); setLoading(true);
+
+    try{
+      // Llama a tu función de Supabase por CÉDULA
+      const { data, error } = await supabase.rpc('app_login_cedula', {
+  p_cedula: cedula,
+  p_password: password,
+});
+      if (error) throw new Error(error.message);
+
+   const row:any = Array.isArray(data) ? data[0] : data;
+if (!row) throw new Error("Credenciales inválidas");
+
+      const role:Role = row.role==="ADMIN" ? "admin" : (row.role==="BACK" ? "back" : "asesor");
+
+      onLogin({
+        id: row.id,
+        role,
+        name: row.fullName || "Usuario",
+        email: `${row.cedula || cedula}@dcc.local`,
+        password: "",
+        sala: "0",
+      });
+    }catch(err:any){
+      setError(err.message || "Error de autenticación");
+    }finally{
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth">
+      <div className="auth-card">
+        <aside className="auth-left">
+          <div className="brand">
+            <img src="/dcc-logo.png" alt="DCC" />
+            <strong>Digital Contact Center</strong>
+          </div>
+          <div>
+            <h2>Bienvenido/a</h2>
+            <p>Ingresa con tu cédula y contraseña para gestionar tus ventas.</p>
+          </div>
+          <div className="dots" aria-hidden>
+            <span className="dot y"></span><span className="dot b"></span><span className="dot r"></span>
+          </div>
+        </aside>
+
+        <section className="auth-right">
+          <div className="card" style={{border:'none',boxShadow:'none'}}>
+            <div className="card-header" style={{fontSize:18}}>Iniciar sesión</div>
+            <div className="card-body">
+              <form className="auth-form" onSubmit={submit}>
+                <div>
+                  <label className="label">Cédula</label>
+                  <input className="input" inputMode="numeric" value={cedula}
+                    onChange={(e)=>setCedula(e.target.value.replace(/\D/g,""))}
+                    placeholder="Solo números" />
+                </div>
+                <div>
+                  <label className="label">Contraseña</label>
+                  <input className="input" type="password" value={password}
+                    onChange={(e)=>setPassword(e.target.value)} placeholder="••••••••" />
+                </div>
+
+                {error && <div className="error">{error}</div>}
+
+                <button className="btn primary" style={{height:44}} disabled={loading}>
+                  {loading ? "Entrando…" : "Entrar"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+type Estado = "PENDIENTE" | "APROBADO" | "RECHAZADO";
+type Tipo = "PORTABILIDAD" | "MIGRA" | "HOGAR";
+
+/** ===== Nuevos tipos del dominio ===== */
+type Origen = "BASE" | "REDES_SOCIALES" | "GESTION_PROPIA" | "B2CHAT";
+type TipoCliente = "POSPAGO" | "PREPAGO";
+type Tipificacion = "VENTA_MOVIL" | "VENTA_CONVERGENCIA";
+type RedEquipo = "4G" | "5G";
+type SimAdquirida = "SI" | "NO";
+
+/** ====== Tipo principal de Venta (expandido) ====== */
+type Sale = {
+  id: string;
+  asesorId: string;
+  asesor: string;
+
+  sala: string;                 // Sala
+  fecha: string;                // "YYYY-MM-DD"
+
+  cliente: string;
+  tipoDocumento?: "CEDULA" | "CEDULA_EXTRANJERA";
+  cedula?: string;
+  celular?: string;
+  numeroGrabacion?: string;
+  numeroAdicional?: string;
+  emailCliente?: string;
+
+  fechaNacimiento?: string;
+  fechaExpedicion?: string;
+
+  origen?: Origen;
+
+  iccid?: string;
+  numeroAPortar?: string;
+  nip?: string;
+
+  tipoVenta?: "LINEA_NUEVA" | "PORTA_POSTPAGO" | "PORTA_PREPAGO" | "MIGRACION";
+  evaluacionIdentidad?:
+    | "BIOMETRIA_FACIAL_EXTERNA"
+    | "VALIDACION_ID"
+    | "VISION_OTP"
+    | "POLIEDRO"
+    | "BIOMETRIA_FACIAL"
+    | "POLIEDRO_OTP"
+    | "SAFE"
+    | "BASE_SIN_VALIDACION";
+
+  direccion?: string;
+  departamento?: string;
+  ciudad?: string;
+  barrio?: string;
+  vereda?: string;
+  recorrido?: string;
+
+  operador: string;
+  operadorDonante?: "TIGO" | "MOVISTAR" | "WOM" | "ETB" | "VIRGIN" | "MOVIL_EXITO" | "OTRO";
+
+  planGeneral?: "CONECTADOS" | "POWER" | "PREPAGO";
+  planId?: string;
+  idDescuentoOferta?: string;
+  descuentoOferta?: number;
+  codigoPlanAdquirir?: string;
+  fechaActivacion?: string;
+  cargoFijoMensual?: number;
+
+  envioLogistico?: "CLIENTE_COMPRA_SIM" | "ENTREGA_LOGISTICA" | "MIGRACION";
+  clienteTodoClaro?: "SI" | "NO";
+  tipoContrato?: "CONTRATO_GRABADO" | "CONTRATO_DIGITAL";
+
+  redEquipo?: RedEquipo;
+  simAdquirida?: SimAdquirida;
+  tipificacion?: Tipificacion;
+  tipoCliente?: TipoCliente;
+
+  producto: string;
+  tipo: "PORTABILIDAD" | "MIGRA" | "HOGAR"; // derivado
+  monto: number;
+  estado: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+  observacion?: string;
+  obsHist?: string[];
+};
+
+/** ================== Datos demo ================== */
+const USERS: User[] = [
+  { id: "u1", role: "asesor", name: "Andres Cardozo",  email: "Andres@empresa.com",  password: "demo", sala: "1", metas: { diaria: 3, semanal: 12, mensual: 40, presupuesto: 2 } },
+  { id: "u2", role: "asesor", name: "Vaneza PAcheco", email: "Vaneza@empresa.com", password: "demo", sala: "3", metas: { diaria: 2, semanal: 10, mensual: 35, presupuesto: 2 } },
+  { id: "b1", role: "back",   name: "Back Office",  email: "back@empresa.com",   password: "demo", sala: "0" },
+  { id: "a1", role: "admin",  name: "Admin",        email: "admin@empresa.com",  password: "demo", sala: "0" },
+];
+
+const OPERADORES = ["CLARO","TIGO","MOVISTAR","VIRGIN","WOM","ETB","OTROS"] as const;
+const ESTADOS    = ["PENDIENTE","APROBADO","RECHAZADO"] as const;
+const SALAS      = ["1","2","3","4","5"] as const;
+const DOC_TYPES  = ["CEDULA","CEDULA_EXTRANJERA"] as const;
+
+function FirstTimeProfile({ cedula, onSaved }:{ cedula:string; onSaved:(full:string)=>void }) {
+  const [fullName, setFullName] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function submit(e:React.FormEvent) {
+    e.preventDefault(); setError(null); setSaving(true);
+    try{
+      const { data, error } = await supabase.rpc('user_set_info', {
+        p_cedula: cedula,
+        p_full_name: fullName
+      });
+      if (error) throw new Error(error.message);
+      onSaved(fullName);
+    }catch(err:any){
+      setError(err.message || 'No se pudo guardar');
+    }finally{
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{padding:16, border:'1px solid #ddd', borderRadius:8, marginTop:16}}>
+      <h3>Completa tu información</h3>
+      <form onSubmit={submit} style={{display:'grid', gap:8, maxWidth:420}}>
+        <label>Nombre completo</label>
+        <input value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Ej: Juan Pérez" />
+        {error && <div style={{color:'#b91c1c'}}>{error}</div>}
+        <button disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+      </form>
+    </div>
+  );
+}
+
+const { data: ventas, error } = await supabase.from('VentasVisible').select('*')
+; // si usaste Opción B
+if (!ventas || ventas.length === 0) {
+  // Mostrar pantalla "Aún no hay ventas. Sube tu primera venta."
+}
+
+
+
+/** Validación identidad (normalizada) */
+const EVAL_ID = [
+  "BIOMETRIA_FACIAL_EXTERNA",
+  "VALIDACION_ID",
+  "VISION_OTP",
+  "POLIEDRO",
+  "BIOMETRIA_FACIAL",
+  "POLIEDRO_OTP",
+  "SAFE",
+  "BASE_SIN_VALIDACION",
+] as const;
+
+/** Donante sin duplicados — incluye MÓVIL ÉXITO y OTRO */
+const DONANTE = ["TIGO","MOVISTAR","WOM","ETB","VIRGIN","MOVIL_EXITO","OTRO"] as const;
+
+/** Nuevas listas para selects */
+const ORIGEN_OPTS = ["BASE","REDES_SOCIALES","GESTION_PROPIA","B2CHAT"] as const;
+const TIPO_CLIENTE_OPTS = ["POSPAGO","PREPAGO"] as const;
+const TIPIFICACION_OPTS = ["VENTA_MOVIL","VENTA_CONVERGENCIA"] as const;
+const RED_OPTS = ["4G","5G"] as const;
+const SIM_OPTS = ["SI","NO"] as const;
+
+/** ================== Derivar tipo ================== */
+function deriveTipoFrom(tipoVenta?: Sale["tipoVenta"]): Sale["tipo"] {
+  if (!tipoVenta) return "MIGRA";
+  if (tipoVenta === "PORTA_POSTPAGO" || tipoVenta === "PORTA_PREPAGO") return "PORTABILIDAD";
+  if (tipoVenta === "MIGRACION") return "MIGRA";
+  return "MIGRA";
+}
+
+const LS_SALES = "dcc_sales_v2";
+const LS_USER  = "dcc_user_v1";
+
+/** ================== Utils ================== */
+function mulberry32(a:number){return function(){let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296}} const rand = mulberry32(54321);
+const clamp = (n:number, min=0, max=100)=>Math.max(min,Math.min(max,n));
+const pct   = (a:number,b:number)=> clamp(Math.round((a/Math.max(1,b))*100));
+const fmt   = (n:number)=> n.toLocaleString();
+const isSameDay = (iso:string, base:Date = new Date()) => new Date(iso).toDateString() === base.toDateString();
+const startOfWeek = (d:Date = new Date()) => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0,0,0,0); return x; };
+const endOfWeek   = (d:Date = new Date()) => { const s = startOfWeek(d); const e = new Date(s); e.setDate(s.getDate() + 7); return e; };
+const isThisWeek  = (iso:string) => { const t = new Date(iso); return t >= startOfWeek() && t < endOfWeek(); };
+const isThisMonth = (iso:string, d:Date = new Date()) => { const t = new Date(iso); return t.getFullYear() === d.getFullYear() && t.getMonth() === d.getMonth(); };
+const inRange = (iso:string, from?: string|null, to?: string|null) => { const t = new Date(iso).getTime(); return (from ? t >= new Date(from).getTime() : true) && (to ? t <= new Date(to).getTime() : true); };
+const pretty = (v:any)=> (v==null || v==="") ? "-" : String(v).replaceAll("_"," ");
+const isNonEmpty = (s?: string) => !!(s && s.trim().length > 0);
+
+/** ================== Persistencia ================== */
+function usePersistentState<T>(key:string, initial: T | (()=>T)): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [state, setState] = useState<T>(() => {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : (typeof initial === "function" ? (initial as any)() : initial); }
+    catch { return (typeof initial === "function" ? (initial as any)() : initial); }
+  });
+  useEffect(()=>{ try{ localStorage.setItem(key, JSON.stringify(state)); }catch{} },[key,state]);
+  return [state, setState];
+}
+
+/** ================== Seed ventas (demo) ================== */
+function dateMinus(days:number){ const x=new Date(); x.setDate(x.getDate()-days); return x.toISOString().slice(0,10); }
+function randomPhone(){ return "3" + Math.floor(100000000 + Math.random()*900000000); }
+function seedSales(): Sale[] {
+  const s: Sale[] = [];
+  for (let d = 24; d >= 0; d--) {
+    const fecha = dateMinus(d);
+    for (const u of USERS.filter((x) => x.role === "asesor")) {
+      if (rand() < 0.55) continue;
+      const n = 1 + Math.floor(rand() * 3);
+      for (let k = 0; k < n; k++) {
+        const tipo = ["PORTABILIDAD","MIGRA","HOGAR"][Math.floor(rand()*3)] as Tipo;
+        const operador = ["CLARO","TIGO","MOVISTAR","VIRGIN","WOM","ETB","OTROS"][Math.floor(rand()*7)];
+        const p = rand();
+        const estado: Estado = p < 0.70 ? "APROBADO" : (p < 0.88 ? "PENDIENTE" : "RECHAZADO");
+
+        s.push({
+          id: "s_" + Math.random().toString(36).slice(2),
+          asesorId: u.id,
+          asesor: u.name,
+          sala: u.sala,
+          fecha,
+          cliente: "Cliente " + Math.floor(rand() * 9000 + 1000),
+          celular: randomPhone(),
+          numeroAdicional: "",
+          numeroGrabacion: "",
+          producto: "Plan " + (1 + Math.floor(rand() * 3)),
+          tipo,
+          operador,
+          monto: Math.floor(rand() * 3000 + 500),
+          estado,
+          observacion: "",
+          obsHist: [],
+        } as Sale);
+      }
+    }
+  }
+  return s;
+}
+function loadSales(): Sale[] {
+  try{ const raw=localStorage.getItem(LS_SALES); if(raw) return JSON.parse(raw) as Sale[]; }catch{}
+  const seeded=seedSales(); try{ localStorage.setItem(LS_SALES, JSON.stringify(seeded)); }catch{}
+  return seeded;
+}
+function saveSales(arr: Sale[]){ try{ localStorage.setItem(LS_SALES, JSON.stringify(arr)); }catch{} }
+
+/** ================== UI base ================== */
+const Card: React.FC<React.PropsWithChildren<{header?: React.ReactNode; style?: React.CSSProperties}>> =
+  ({header,children,style}) => (<div className="card" style={style}>{header && <div className="card-header">{header}</div>}<div className="card-body">{children}</div></div>);
+const KpiBox = ({title, value, accent}:{title:string; value:React.ReactNode; accent?:string}) =>
+  (<Card><div className="kpi-title">{title}</div><div className="kpi-value" style={{color: accent || "#111"}}>{value}</div></Card>);
+const Progress = ({value}:{value:number}) => (<div className="progress"><i style={{width: clamp(value)+'%'}}/></div>);
+function Gauge({ pctValue }:{pctValue:number}) {
+  const v=clamp(pctValue);
+  const data=[{name:"ok",value:v},{name:"rest",value:100-v}];
+  return (<div className="chart h-220">
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart><Pie data={data} dataKey="value" startAngle={180} endAngle={0} innerRadius={60} outerRadius={80}>
+        <Cell fill={"#2aa6a5"}/><Cell fill={"#e5e7eb"}/>
+      </Pie></PieChart>
+    </ResponsiveContainer>
+  </div>);
+}
+const Pill = ({children}:{children:React.ReactNode}) => <span className="pill">{children}</span>;
+
+/** ================== Login / Header ================== */
+
+// ⬆⬆ Reemplaza tu función Login por esta ⬆⬆
+
+
+function AppHeader(
+  { currentUser, onLogout }:
+  { currentUser: User | null; onLogout: () => void }
+) {
+  return (
+    <header className="app-header">
+      <div className="container header-grid">
+        <div className="brand">DCC</div>
+        <div style={{flex:1}} />
+        {currentUser && (
+          <div style={{display:'flex',gap:12,alignItems:'center'}}>
+            <span>{currentUser.name} — {String(currentUser.role).toUpperCase()}</span>
+            <button className="btn" onClick={onLogout}>Salir</button>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+ 
+
+/** ================== Verificación externa (placeholder) ================== */
+async function verifyExternalStatus(_sale: Sale): Promise<{status: Estado}> {
+  await new Promise(r=>setTimeout(r, 300));
+  return { status: "PENDIENTE" };
+}
+
+/** ================== Modal genérico ================== */
+function Modal({
+  title,
+  children,
+  onClose,
+  maxWidth = 980,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+  maxWidth?: number;
+}) {
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true">
+      <div className="modal-panel" style={{ width: `min(96vw, ${maxWidth}px)` }}>
+        <div className="modal-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="card-header" style={{ padding: 0, border: "none" }}>{title}</div>
+          <button className="btn" onClick={onClose} aria-label="Cerrar">✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** ================== Stepper ================== */
+function Stepper({steps,current}:{steps:string[]; current:number;}){
+  const pct = Math.round(((current+1)/steps.length)*100);
+  return (
+    <div>
+      <div className="progress-rail"><div className="progress-fill" style={{width:`${pct}%`}}/></div>
+      <div className="stepper">
+        {steps.map((t,i)=>(
+          <div key={i} className={`step ${i===current ? "active": ""} ${i<current?"done":""}`}>
+            <span className="step-dot">{i<current ? "✓" : i+1}</span>
+            <span className="step-text">{t}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** ================== Helpers layout ================== */
+function FieldRow({cols=2, children}:{cols?:1|2|3|4; children:React.ReactNode;}) {
+  return <div className="field-row" style={{["--cols" as any]: cols} as React.CSSProperties}>{children}</div>;
+}
+
+/** ================== Modal de rechazo ================== */
+function RejectDialog({
+  reason,
+  setReason,
+  onConfirm,
+  onCancel,
+}: {
+  reason: string;
+  setReason: (s: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="card modal-card" style={{ maxWidth: 520 }}>
+        <div className="card-header">Motivo del rechazo</div>
+        <div className="card-body modal-body">
+          <p className="note" style={{ marginTop: -6, marginBottom: 8 }}>
+            Escribe por qué se rechaza esta venta. Este texto lo verá el asesor y quedará registrado.
+          </p>
+          <textarea
+            className="input"
+            style={{ minHeight: 110 }}
+            placeholder="Ej.: Documento ilegible, datos incompletos, no coincide con pedido, etc."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <div className="flex-row">
+            <button className="btn" onClick={onCancel}>Cancelar</button>
+            <button className="btn primary" onClick={onConfirm} disabled={!isNonEmpty(reason)}>
+              Guardar rechazo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** ================== Detalle Venta ================== */
+function KV({label, value}:{label:string; value:any}) {
+  return (
+    <div className="kv">
+      <div className="kv-label">{label}</div>
+      <div className="kv-value">{pretty(value)}</div>
+    </div>
+  );
+}
+function Section({title, children}:{title:string; children:React.ReactNode}) {
+  return (
+    <div className="section">
+      <div className="section-title">{title}</div>
+      {children}
+    </div>
+  );
+}
+function SaleDetailModal({sale, onClose}:{sale: Sale; onClose: ()=>void}) {
+  return (
+    <Modal title={`Detalle de venta — ${sale.cliente}`} onClose={onClose} maxWidth={1000}>
+      <div className="grid-2 responsive-gap">
+        <Section title="Datos básicos">
+          <div className="grid-2">
+            <KV label="Sala" value={sale.sala}/>
+            <KV label="Fecha" value={sale.fecha}/>
+            <KV label="Asesor" value={sale.asesor}/>
+            <KV label="Estado" value={sale.estado==="APROBADO"?"EXITOSA":sale.estado}/>
+            <KV label="Producto" value={sale.producto}/>
+            <KV label="Monto" value={sale.monto}/>
+            <KV label="Tipo (derivado)" value={sale.tipo}/>
+            <KV label="Origen" value={sale.origen}/>
+            <KV label="Tipo de cliente" value={sale.tipoCliente}/>
+          </div>
+        </Section>
+
+        <Section title="Documento / Contacto">
+          <div className="grid-2">
+            <KV label="Tipo de documento" value={sale.tipoDocumento}/>
+            <KV label="Cédula" value={sale.cedula}/>
+            <KV label="Email" value={sale.emailCliente}/>
+            <KV label="Celular" value={sale.celular}/>
+            <KV label="Grabación" value={sale.numeroGrabacion}/>
+            <KV label="Número adicional" value={sale.numeroAdicional}/>
+            <KV label="ICCID" value={sale.iccid}/>
+            <KV label="Número a portar" value={sale.numeroAPortar}/>
+            <KV label="NIP" value={sale.nip}/>
+          </div>
+        </Section>
+
+        <Section title="Cliente">
+          <div className="grid-2">
+            <KV label="Nombre" value={sale.cliente}/>
+            <KV label="Fecha de nacimiento" value={sale.fechaNacimiento}/>
+            <KV label="Fecha de expedición" value={sale.fechaExpedicion}/>
+          </div>
+        </Section>
+
+        <Section title="Dirección">
+          <div className="grid-2">
+            <KV label="Dirección" value={sale.direccion}/>
+            <KV label="Departamento" value={sale.departamento}/>
+            <KV label="Ciudad" value={sale.ciudad}/>
+            <KV label="Barrio" value={sale.barrio}/>
+            <KV label="Vereda" value={sale.vereda}/>
+            <div style={{gridColumn:"1 / -1"}}>
+              <KV label="Recorrido / Nota" value={sale.recorrido}/>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Operadores / Venta">
+          <div className="grid-2">
+            <KV label="Tipo de venta" value={sale.tipoVenta}/>
+            <KV label="Evaluación identidad" value={sale.evaluacionIdentidad}/>
+            <KV label="Operador destino" value={sale.operador}/>
+            <KV label="Operador donante" value={sale.operadorDonante}/>
+            <KV label="Tipificación" value={sale.tipificacion}/>
+          </div>
+        </Section>
+
+        <Section title="Plan / Oferta">
+          <div className="grid-2">
+            <KV label="Plan general" value={sale.planGeneral}/>
+            <KV label="ID / Código de plan" value={sale.planId}/>
+            <KV label="ID Descuento oferta" value={sale.idDescuentoOferta}/>
+            <KV label="Descuento (num.)" value={sale.descuentoOferta}/>
+            <KV label="Código plan adquirido" value={sale.codigoPlanAdquirir}/>
+            <KV label="Fecha de activación" value={sale.fechaActivacion}/>
+            <KV label="CFM (Cargo fijo mensual)" value={sale.cargoFijoMensual}/>
+          </div>
+        </Section>
+
+        <Section title="Logística / Flags">
+          <div className="grid-2">
+            <KV label="Envío logístico" value={sale.envioLogistico}/>
+            <KV label="Cliente Todo Claro" value={sale.clienteTodoClaro}/>
+            <KV label="Tipo de contrato" value={sale.tipoContrato}/>
+            <KV label="Red del equipo" value={sale.redEquipo}/>
+            <KV label="SIM adquirida" value={sale.simAdquirida}/>
+          </div>
+        </Section>
+
+        <Section title="Historial de observaciones">
+          {sale.obsHist && sale.obsHist.length>0 ? (
+            <ul className="obs-list">
+              {sale.obsHist.map((x,i)=><li key={i}>{x}</li>)}
+            </ul>
+          ) : <div className="note">Sin historial.</div>}
+        </Section>
+      </div>
+    </Modal>
+  );
+}
+
+/** ================== Tabla (lista mínima + responsive) ================== */
+function SalesTableMini({
+  rows,
+  readonly = false,
+  onApprove,
+  onPending,
+  onReject,
+  onEdit,
+  onView,
+}: {
+  rows: Sale[];
+  readonly?: boolean;
+  onApprove?: (id: string) => void;
+  onPending?: (id: string) => void;
+  onReject?: (id: string) => void;
+  onEdit?: (s: Sale) => void;
+  onView?: (s: Sale) => void;
+}) {
+  const tone = (s: Estado) =>
+    s === "APROBADO" ? "#059669" : s === "PENDIENTE" ? "#92400e" : "#991b1b";
+
+  return (
+    <div className="table-wrap">
+      <table className="stack">
+        <thead>
+          <tr>
+            {["Sala","Asesor","Nombre del Cliente","Celular","Estado","Observación","Acciones"].map((h, i) => (
+              <th key={i}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td data-label="Sala">{r.sala}</td>
+              <td data-label="Asesor">{r.asesor}</td>
+              <td data-label="Nombre del Cliente" style={{fontWeight:600}}>{r.cliente}</td>
+              <td data-label="Celular">{r.celular || r.numeroAPortar || r.numeroAdicional || "-"}</td>
+              <td data-label="Estado">
+                <span className="pill" style={{ borderColor: "#e5e7eb", color: tone(r.estado) }}>
+                  {r.estado === "APROBADO" ? "EXITOSA" : r.estado}
+                </span>
+              </td>
+              <td data-label="Observación" className="obs">{r.observacion || ""}</td>
+              <td data-label="Acciones">
+                <div className="btn-row">
+                  {onView && <button className="btn" onClick={() => onView(r)} title="Ver detalle">Ver detalle</button>}
+                  {readonly ? (
+                    r.estado === "RECHAZADO" && onEdit ? (
+                      <button className="btn" onClick={() => onEdit(r)} title="Corregir"><Edit3 size={16} /></button>
+                    ) : null
+                  ) : (
+                    <>
+                      {onApprove && <button className="btn primary" onClick={() => onApprove(r.id)} title="Marcar Exitosa">Exitosa</button>}
+                      {onPending && <button className="btn" onClick={() => onPending(r.id)} title="Marcar Pendiente">Pendiente</button>}
+                      {onReject && <button className="btn" onClick={() => onReject(r.id)} title="Rechazar con observación">Rechazar…</button>}
+                    </>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length === 0 && (
+        <p className="table-empty">No hay registros con estos filtros.</p>
+      )}
+    </div>
+  );
+}
+
+/** ================== Back Office ================== */
+function BackOfficeView({
+  sales, setSales, isAdmin = false
+}: {
+  sales: Sale[];
+  setSales: (updater: (prev: Sale[]) => Sale[]) => void;
+  isAdmin?: boolean;
+}) {
+  const asesores = USERS.filter((u) => u.role === "asesor");
+  const [estado, setEstado] = useState<"Todos" | Estado>("Todos");
+  const [asesorId, setAsesorId] = useState<string>("Todos");
+  const [sala, setSala] = useState<string>("Todas");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [tab, setTab] = useState<"principal" | "general" | "salas" | "detalle">("detalle");
+
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [detailSale, setDetailSale] = useState<Sale|null>(null);
+
+  const filtered = useMemo(
+    () =>
+      sales.filter(
+        (s) =>
+          (estado === "Todos" || s.estado === estado) &&
+          (asesorId === "Todos" || s.asesorId === asesorId) &&
+          (sala === "Todas" || s.sala === sala) &&
+          inRange(s.fecha, from || null, to || null)
+      ),
+    [sales, estado, asesorId, sala, from, to]
+  );
+
+  const counts = useMemo(
+    () => ({ pend: filtered.filter((s) => s.estado === "PENDIENTE").length }),
+    [filtered]
+  );
+
+  const setStatus = (id: string, st: Estado) => {
+    if (st === "RECHAZADO") {
+      setRejectingId(id);
+      setRejectReason("");
+      return;
+    }
+    setSales((prev) => {
+      const next = prev.map((s) =>
+        s.id === id ? { ...s, estado: st, observacion: st === "APROBADO" ? "" : s.observacion } : s
+      );
+      saveSales(next);
+      return next;
+    });
+  };
+
+  const confirmReject = () => {
+    if (!rejectingId || !isNonEmpty(rejectReason)) return;
+    const reason = rejectReason.trim();
+    setSales((prev) => {
+      const next = prev.map((s) =>
+        s.id === rejectingId
+          ? {
+              ...s,
+              estado: "RECHAZADO",
+              observacion: reason,
+              obsHist: [...(s.obsHist || []), `[${new Date().toLocaleString()}] ${reason}`],
+            }
+          : s
+      );
+      saveSales(next);
+      return next;
+    });
+    setRejectingId(null);
+    setRejectReason("");
+  };
+  const cancelReject = () => {
+    setRejectingId(null);
+    setRejectReason("");
+  };
+
+  return (
+    <div className="container">
+      <div className="row auto-3">
+        <KpiBox title="Ventas Pendientes" value={<span style={{ color: "var(--magenta)" }}>{fmt(counts.pend)}</span>} />
+        <KpiBox
+          title="Presupuesto Diario"
+          value={fmt(USERS.filter((u) => u.role === "asesor").reduce((a, u) => a + (u.metas?.presupuesto || 0),0))}
+        />
+        <Card header="Meta">
+          <Gauge pctValue={62} />
+          <div className="kpi-meta">
+            <span className="kpi-meta-strong">1468</span>
+            <span className="kpi-meta-dim"> / 2447</span>
+          </div>
+        </Card>
+      </div>
+      
+      <div className="toolbar">
+        <div className="left">
+          <span className="toolbar-title">Panel {isAdmin ? "Administrador" : "Back Office"}</span>
+        </div>
+        <div className="right">
+          {isAdmin && <button className="btn ghost">Configurar metas</button>}
+          <button className="btn" onClick={() => exportCSV(filtered)}>Exportar CSV</button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-header filters-header">
+          <span className="filters-title"><Filter size={16} />Filtros</span>
+          <button className="btn" onClick={() => exportCSV(filtered)}>Exportar CSV</button>
+        </div>
+        <div className="card-body filters-grid">
+          <Select label="Sala" value={sala} onChange={setSala} options={["Todas", "1", "2", "3", "4", "5"]}/>
+          <Select label="Estado" value={estado} onChange={setEstado as any} options={["Todos", ...ESTADOS]}/>
+          <div className="span-2">
+            <Select label="Agente" value={asesorId} onChange={setAsesorId}
+              options={["Todos", ...asesores.map((a) => ({ label: a.name, value: a.id }))]}/>
+          </div>
+          <DateInput label="Desde" value={from} onChange={setFrom} />
+          <DateInput label="Hasta" value={to} onChange={setTo} />
+        </div>
+      </div>
+
+      <div className="tabs" style={{marginTop:8}}>
+        {([["detalle", "Ventas (lista mínima)"],["principal", "Informe Principal"],["general", "Informe General"],["salas", "Informe Salas"]] as const)
+          .map(([id, label]) => (
+          <button key={id} className={"tab" + (tab === id ? " active" : "")} onClick={() => setTab(id as any)}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "detalle" && (
+        <Card header="Ventas">
+          <div className="card-body">
+            <SalesTableMini
+              rows={filtered}
+              onView={(s)=>setDetailSale(s)}
+              onApprove={(id) => setStatus(id, "APROBADO")}
+              onPending={(id) => setStatus(id, "PENDIENTE")}
+              onReject={(id) => { setRejectingId(id); setRejectReason(""); }}
+            />
+          </div>
+        </Card>
+      )}
+      {tab === "principal" && <InformePrincipal rows={filtered} />}
+      {tab === "general" && <InformeGeneral rows={filtered} />}
+      {tab === "salas" && <InformeSalas rows={filtered} />}
+
+      {rejectingId && (
+        <RejectDialog reason={rejectReason} setReason={setRejectReason} onConfirm={confirmReject} onCancel={cancelReject}/>
+      )}
+      {detailSale && <SaleDetailModal sale={detailSale} onClose={()=>setDetailSale(null)} />}
+
+      <div style={{ marginTop: 16 }}>
+        <TestPanel sales={filtered} />
+      </div>
+    </div>
+  );
+}
+
+/** ================== Asesor ================== */
+function AsesorView({
+  user,
+  sales,
+  setSales,
+}: {
+  user: User;
+  sales: Sale[];
+  setSales: (updater: (prev: Sale[]) => Sale[]) => void;
+}) {
+  const mySales = useMemo(() => sales.filter((s) => s.asesorId === user.id), [sales, user.id]);
+  const isEmpty = mySales.length === 0;
+  const okH = mySales.filter((s) => isSameDay(s.fecha) && s.estado === "APROBADO").length;
+  const okW = mySales.filter((s) => isThisWeek(s.fecha) && s.estado === "APROBADO").length;
+  const okM = mySales.filter((s) => isThisMonth(s.fecha) && s.estado === "APROBADO").length;
+  const [estadoFiltro, setEstadoFiltro] = useState<"Todos" | Estado>("Todos");
+  const mySalesFiltered = useMemo(
+    () => mySales.filter((s) => estadoFiltro === "Todos" || s.estado === estadoFiltro),
+    [mySales, estadoFiltro]
+  );
+
+  const [openForm, setOpenForm] = useState(false);
+  const [editing, setEditing] = useState<Sale | null>(null);
+  const [detailSale, setDetailSale] = useState<Sale|null>(null);
+
+  const onAdd = (sale: Sale) =>
+    setSales((prev) => { const next = [sale, ...prev]; saveSales(next); return next; });
+  const onUpdate = (sale: Sale) =>
+    setSales((prev) => { const next = prev.map((s) => (s.id === sale.id ? sale : s)); saveSales(next); return next; });
+
+  return (
+    
+    <div className="container">
+      <div className="row auto-3">
+        {isEmpty && (
+  <div className="empty">
+    <img src="/img/empty-sales.svg" alt="Sin ventas" onError={(e:any)=>{e.currentTarget.style.display="none"}}/>
+    <h3>Aún no tienes ventas</h3>
+    <p className="muted">Registra tu primera venta con el botón “Registrar venta”.</p>
+    <button className="btn primary" onClick={()=>{ setEditing(null); setOpenForm(true); }}>Registrar venta</button>
+  </div>
+)}
+        <Card><div className="kpi-title">Meta diaria</div><div className="kpi-value">{okH}/{user.metas?.diaria ?? 0}</div><div style={{ marginTop: 8 }}><Progress value={(okH / (user.metas?.diaria || 1)) * 100} /></div></Card>
+        <Card><div className="kpi-title">Meta semanal</div><div className="kpi-value">{okW}/{user.metas?.semanal ?? 0}</div><div style={{ marginTop: 8 }}><Progress value={(okW / (user.metas?.semanal || 1)) * 100} /></div></Card>
+        <Card><div className="kpi-title">Meta mensual</div><div className="kpi-value">{okM}/{user.metas?.mensual ?? 0}</div><div style={{ marginTop: 8 }}><Progress value={(okM / (user.metas?.mensual || 1)) * 100} /></div></Card>
+      </div>
+
+      <div className="row one" style={{ marginTop: 16 }}>
+        <Card header={
+          <div className="card-header-flex">
+            <span>Mis ventas</span>
+            <div className="card-header-actions">
+              <div className="filter-mini">
+                <Select label="Estado" value={estadoFiltro} onChange={setEstadoFiltro as any} options={["Todos", "PENDIENTE", "APROBADO", "RECHAZADO"]}/>
+              </div>
+              <button className="btn primary" onClick={()=>{ setEditing(null); setOpenForm(true); }}>
+                <Plus size={16} style={{marginRight:6}}/> Registrar venta
+              </button>
+            </div>
+          </div>
+        }>
+          <div className="card-body">
+            <SalesTableMini rows={mySalesFiltered} readonly onView={(s)=>setDetailSale(s)} onEdit={(s) => { setEditing(s); setOpenForm(true); }}/>
+          </div>
+        </Card>
+      </div>
+
+      {openForm && (
+        <SaleFormModal user={user} editing={editing} onClose={()=>{ setOpenForm(false); setEditing(null); }} onAdd={onAdd} onUpdate={onUpdate}/>
+      )}
+      {detailSale && <SaleDetailModal sale={detailSale} onClose={()=>setDetailSale(null)} />}
+    </div>
+  );
+}
+
+/** ================== Controles ================== */
+function Select({ label, value, onChange, options }:{
+  label:string; value:any; onChange:(v:any)=>void; options:(string|{label:string;value:string})[]
+}) {
+  const items = options.map(o=> typeof o==="string"?({label:o,value:o}):o );
+  return (<div><label className="label">{label}</label>
+    <div className="select-wrap">
+      <select className="select" value={value} onChange={(e)=>onChange(e.target.value)}>
+        {items.map((o)=><option key={o.value??o.label} value={o.value??o.label}>{o.label}</option>)}
+      </select>
+      <ChevronDown className="select-caret" size={16}/>
+    </div>
+  </div>);
+}
+const DateInput = ({label,value,onChange}:{label:string; value:string; onChange:(v:string)=>void}) =>
+  (<div><label className="label">{label}</label><input type="date" className="input" value={value} onChange={e=>onChange(e.target.value)}/></div>);
+
+/** ================== Informes ================== */
+function groupBy<T>(arr:T[], key: keyof T | ((x:T)=>string)){
+  const m=new Map<string,T[]>(); for(const x of arr){ const k=typeof key==='function'?(key as any)(x): String((x as any)[key]); m.set(k,(m.get(k)||[]).concat(x)); } return m;
+}
+
+function InformePrincipal({ rows }:{ rows:Sale[] }){
+  const tabla = useMemo(()=>{ const map = new Map<string, any>(); rows.forEach(r=>{
+    const meta = USERS.find(u=>u.name===r.asesor)?.metas?.mensual || 40;
+    const cur = map.get(r.asesor) || {agente:r.asesor, porta:0, migra:0, pendMov:0, descMov:0, meta, servHogar:0, ventHogar:0, pendHogar:0, descHogar:0, metaPct:0};
+    if(r.tipo==="PORTABILIDAD" && r.estado==="APROBADO") cur.porta+=1;
+    if(r.tipo==="MIGRA" && r.estado==="APROBADO") cur.migra+=1;
+    if(r.tipo==="HOGAR" && r.estado==="APROBADO") cur.ventHogar+=1;
+    if(r.estado==="PENDIENTE"){ if(r.tipo==="HOGAR") cur.pendHogar+=1; else cur.pendMov+=1; }
+    if(r.estado==="RECHAZADO"){ if(r.tipo==="HOGAR") cur.descHogar-=1; else cur.descMov-=1; }
+    map.set(r.asesor, cur);
+  });
+  const arr = Array.from(map.values());
+  arr.forEach((m:any)=>{ const acum=m.porta+m.migra+m.ventHogar; m.metaPct = Math.round((acum/(m.meta||1))*100); });
+  return arr; },[rows]);
+
+  const totals = useMemo(()=>tabla.reduce((a:any,r:any)=>( {
+    porta:a.porta+r.porta, migra:a.migra+r.migra, pendMovil:a.pendMovil+r.pendMovil, descMovil:a.descMovil+r.descMovil,
+    meta:a.meta+r.meta, servHogar:a.servHogar+r.servHogar, ventHogar:a.ventHogar+r.ventHogar, pendHogar:a.pendHogar+r.pendHogar, descHogar:a.descHogar+r.descHogar
+  } ),{porta:0,migra:0,pendMovil:0,descMovil:0,meta:0,servHogar:0,ventHogar:0,pendHogar:0,descHogar:0}),[tabla]);
+
+  return (<div className="card" style={{marginTop:16, overflow:"hidden"}}>
+    <table>
+      <thead><tr>{["AGENTE","Porta","Migra","Pend. Movil","Desc. Movil","Meta","Serv. Hogar","Ventas Hogar","Pend. Hogar","Desc. Hogar","Meta Porcentaje"].map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+      <tbody>{tabla.map((row:any, i:number)=>(
+        <tr key={i} style={{background:i%2?"#fafafa":"#fff"}}>
+          <td style={{fontWeight:600,whiteSpace:"nowrap"}}>{row.agente}</td>
+          <td>{row.porta}</td><td>{row.migra}</td><td>{row.pendMov||0}</td>
+          <td style={{color: row.descMov < 0 ? "#e11d48" : "#111"}}>{row.descMov||0}</td>
+          <td>{row.meta}</td><td>{row.servHogar}</td><td>{row.ventHogar}</td><td>{row.pendHogar}</td>
+          <td style={{color: row.descHogar < 0 ? "#e11d48" : "#111"}}>{row.descHogar}</td>
+          <td><div style={{display:"flex",alignItems:"center",gap:8}}><div className="progress"><i style={{width: row.metaPct+'%'}}/></div><span style={{fontFeatureSettings:"'tnum' 1"}}>{row.metaPct}%</span></div></td>
+        </tr>
+      ))}</tbody>
+      <tfoot><tr>
+        <td>Total</td><td>{fmt(totals.porta)}</td><td>{fmt(totals.migra)}</td><td>{fmt(totals.pendMovil)}</td><td>{fmt(totals.descMovil)}</td>
+        <td>{fmt(totals.meta)}</td><td>{fmt(totals.servHogar)}</td><td>{fmt(totals.ventHogar)}</td><td>{fmt(totals.pendHogar)}</td><td>{fmt(totals.descHogar)}</td>
+        <td>{(()=>{ const acum = totals.porta + totals.migra + totals.ventHogar; return <span style={{fontFeatureSettings:"'tnum' 1"}}>{pct(acum, totals.meta)}%</span>})()}</td>
+      </tr></tfoot>
+    </table>
+  </div>);
+}
+
+function InformeGeneral({ rows }:{ rows:Sale[] }){
+  const byDate = groupBy(rows, "fecha");
+  const line = Array.from(byDate.keys()).sort().map(fecha=>{
+    const items = byDate.get(fecha)!;
+    const c = (st:Estado)=> items.filter((x:any)=>x.estado===st).length;
+    return { fecha, PENDIENTE:c("PENDIENTE"), APROBADO:c("APROBADO"), RECHAZADO:c("RECHAZADO") };
+  });
+
+  const claro = rows.filter((s)=>s.operador==="CLARO").length;
+  const donutClaro = [{ name:"NO", value:Math.max(0, rows.length - claro) }, { name:"SI", value:claro }];
+
+  const byOp = groupBy(rows,"operador");
+  const donutOp = (["CLARO","TIGO","MOVISTAR","VIRGIN","WOM","ETB","OTROS"] as const)
+    .map(op=>({name:op, value:(byOp.get(op)||[]).length}))
+    .filter(x=>x.value>0);
+
+  const asesores = Array.from(new Set(rows.map((s)=>s.asesor)));
+  const stacked  = asesores.map(a=>{
+    const r = rows.filter((s)=>s.asesor===a);
+    const obj:any = { asesor:a };
+    for(const op of ["CLARO","TIGO","MOVISTAR","VIRGIN","WOM","ETB","OTROS"] as const) obj[op] = r.filter((s)=>s.operador===op).length;
+    return obj;
+  });
+
+  return (<div className="row two" style={{marginTop:16}}>
+    <Card header="Ventas por Fecha">
+      <div className="chart h-280">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={line}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="fecha"/><YAxis/><Tooltip/><Legend/>
+            <Line type="monotone" dataKey="PENDIENTE" stroke="#8884d8" dot={false}/>
+            <Line type="monotone" dataKey="APROBADO"  stroke="#10b981" dot={false}/>
+            <Line type="monotone" dataKey="RECHAZADO" stroke="#ef4444" dot={false}/>
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+
+    <Card header="Todo Claro">
+      <div className="chart h-280">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={donutClaro} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90}>
+              {donutClaro.map((_,i)=><Cell key={i}/>)}
+            </Pie>
+            <Legend/><Tooltip/>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+
+    <Card header="Asesor por Operador">
+      <div className="chart h-330">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={stacked}>
+            <CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="asesor" interval={0} angle={-30} textAnchor="end" height={80}/><YAxis/><Legend/><Tooltip/>
+            {(["CLARO","TIGO","MOVISTAR","VIRGIN","WOM","ETB","OTROS"] as const).map(op=><Bar key={op} dataKey={op} stackId="a"/>)}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+
+    <Card header="Ventas por Operador">
+      <div className="chart h-330">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={donutOp} dataKey="value" nameKey="name" outerRadius={110}>
+              {donutOp.map((_,i)=><Cell key={i}/>)}
+            </Pie>
+            <Legend/><Tooltip/>
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  </div>);
+}
+
+function InformeSalas({ rows }:{ rows:Sale[] }){
+  const tabla = useMemo(()=>{ const m = new Map<string, any>();
+    for(const s of rows){
+      const r = m.get(s.asesor) || {
+        asesor:s.asesor, porta:0, migra:0, acumuladas:0,
+        meta: USERS.find(u=>u.name===s.asesor)?.metas?.mensual || 40,
+        faltan:0, presupuesto: USERS.find(u=>u.name===s.asesor)?.metas?.presupuesto || 0
+      };
+      if(s.estado==="APROBADO"){ if(s.tipo==="PORTABILIDAD") r.porta++; if(s.tipo==="MIGRA") r.migra++; r.acumuladas++; }
+      m.set(s.asesor,r);
+    }
+    const arr = Array.from(m.values());
+    arr.forEach((r:any)=>{ r.faltan=Math.max(0,(r.meta||0)-(r.acumuladas||0)); });
+    return arr;
+  },[rows]);
+
+  const totals = tabla.reduce((a:any,r:any)=>( {
+    porta:a.porta+r.porta, migra:a.migra+r.migra, acumuladas:a.acumuladas+r.acumuladas,
+    meta:a.meta+r.meta, faltan:a.faltan+r.faltan, presupuesto:a.presupuesto+r.presupuesto
+  } ),{porta:0,migra:0,acumuladas:0,meta:0,faltan:0,presupuesto:0});
+
+  const pendientesHoy = rows.filter((s)=>s.estado==="PENDIENTE" && isSameDay(s.fecha)).length;
+  const okHoy = rows.filter((s)=>s.estado==="APROBADO" && isSameDay(s.fecha)).length;
+
+  return (<div className="row two" style={{marginTop:16}}>
+    <Card><div className="table-wrap"><table>
+      <thead><tr>{["AGENTE","Porta","Migra","Acumuladas","Meta","Te Faltan","Presupuesto Diario"].map((h,i)=><th key={i}>{h}</th>)}</tr></thead>
+      <tbody>{tabla.map((r:any,i:number)=>(
+        <tr key={i} style={{background:i%2?"#fafafa":"#fff"}}>
+          <td style={{fontWeight:600}}>{r.asesor}</td><td>{r.porta}</td><td>{r.migra}</td><td>{r.acumuladas}</td><td>{r.meta}</td><td>{r.faltan}</td><td>{r.presupuesto}</td>
+        </tr>
+      ))}</tbody>
+      <tfoot><tr>
+        <td>Total</td><td>{fmt(totals.porta)}</td><td>{fmt(totals.migra)}</td><td>{fmt(totals.acumuladas)}</td><td>{fmt(totals.meta)}</td><td>{fmt(totals.faltan)}</td><td>{fmt(totals.presupuesto)}</td>
+      </tr></tfoot>
+    </table></div></Card>
+
+    <div className="row one responsive-gap">
+      <Card header="Presupuesto Diario"><div className="kpi-title">Hoy</div><div className="kpi-value">13</div></Card>
+      <Card header="Agentes"><div className="kpi-title">Activos</div><div className="kpi-value">{fmt(new Set(rows.map((r:any)=>r.asesor)).size)}</div></Card>
+      <Card header="Pendientes Hoy">
+        <div className="chart h-220">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>{(()=>{ const data=[{name:"Ventas Can.",value:okHoy},{name:"Pendiente",value:pendientesHoy}];
+              return (<><Pie data={data} dataKey="value" nameKey="name" innerRadius={60} outerRadius={90}>{data.map((_,i)=><Cell key={i}/>)}</Pie><Legend/><Tooltip/></>);
+            })()}</PieChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+      <Card header="Meta"><div className="kpi-title">Cumplimiento Diario</div><div className="kpi-value">0 %</div><div style={{marginTop:8}}><Progress value={20}/></div></Card>
+    </div>
+  </div>);
+}
+
+/** ================== FORM modal (con selects "Seleccionar" y todos obligatorios) ================== */
+function SaleFormModal({
+  user, editing, onClose, onAdd, onUpdate,
+}: {
+  user: User; editing: Sale | null; onClose: ()=>void; onAdd: (s: Sale) => void; onUpdate: (s: Sale) => void;
+}) {
+  const steps = ["Datos básicos","Documento/Contacto","Cliente","Dirección","Venta/Operadores","Plan/Oferta","Logística/SIM/Red","Resumen"];
+  const [step, setStep] = useState(0);
+
+  // Helpers
+  const digits = (v:string, max:number) => v.replace(/\D/g,"").slice(0,max);
+
+  // ======= Estado de todos los campos =======
+  const [salaSel, setSalaSel] = useState<string>(editing?.sala || ""); // << requiere elegir
+  const [fecha, setFecha] = useState(editing?.fecha || new Date().toISOString().slice(0, 10));
+  const [origen, setOrigen] = useState<Origen| "">(editing?.origen || "");
+  const [tipoCliente, setTipoCliente] = useState<TipoCliente | "">(editing?.tipoCliente || "");
+
+  const [tipoDocumento, setTipoDocumento] = useState<Sale["tipoDocumento"]| "">(editing?.tipoDocumento || "");
+  const [cedula, setCedula] = useState(editing?.cedula || "");
+  const [celular, setCelular] = useState(editing?.celular || "");
+  const [numeroGrabacion, setNumeroGrabacion] = useState(editing?.numeroGrabacion || "");
+  const [numeroAdicional, setNumeroAdicional] = useState(editing?.numeroAdicional || "");
+  const [emailCliente, setEmailCliente] = useState(editing?.emailCliente || "");
+
+  const [cliente, setCliente] = useState(editing?.cliente || "");
+  const [fechaNacimiento, setFechaNacimiento] = useState(editing?.fechaNacimiento || "");
+  const [fechaExpedicion, setFechaExpedicion] = useState(editing?.fechaExpedicion || "");
+
+  const [direccion, setDireccion] = useState(editing?.direccion || "");
+  const [departamento, setDepartamento] = useState(editing?.departamento || "");
+  const [ciudad, setCiudad] = useState(editing?.ciudad || "");
+  const [barrio, setBarrio] = useState(editing?.barrio || "");
+  const [vereda, setVereda] = useState(editing?.vereda || "");
+  const [recorrido, setRecorrido] = useState(editing?.recorrido || "");
+
+  const [tipoVenta, setTipoVenta] = useState<Sale["tipoVenta"]| "">(editing?.tipoVenta || "");
+  const [evaluacionIdentidad, setEvaluacionIdentidad] = useState<Sale["evaluacionIdentidad"]| "">(editing?.evaluacionIdentidad || "");
+  const [operador, setOperador] = useState<string>(editing?.operador || "");
+  const [operadorDonante, setOperadorDonante] = useState<Sale["operadorDonante"] | "">(editing?.operadorDonante || "");
+  const [numeroAPortar, setNumeroAPortar] = useState(editing?.numeroAPortar || "");
+  const [nip, setNip] = useState(editing?.nip || "");
+
+  const [planGeneral, setPlanGeneral] = useState<Sale["planGeneral"] | "">(editing?.planGeneral || "");
+  const [planId, setPlanId] = useState(editing?.planId || "");
+  const [idDescuentoOferta, setIdDescuentoOferta] = useState(editing?.idDescuentoOferta || "");
+  const [descuentoOferta, setDescuentoOferta] = useState(editing?.descuentoOferta != null ? String(editing.descuentoOferta) : "");
+  const [codigoPlanAdquirir, setCodigoPlanAdquirir] = useState(editing?.codigoPlanAdquirir || "");
+  const [fechaActivacion, setFechaActivacion] = useState(editing?.fechaActivacion || "");
+  const [cargoFijoMensual, setCargoFijoMensual] = useState(editing?.cargoFijoMensual != null ? String(editing.cargoFijoMensual) : "");
+
+  const [envioLogistico, setEnvioLogistico] = useState<Sale["envioLogistico"] | "">(editing?.envioLogistico || "");
+  const [clienteTodoClaro, setClienteTodoClaro] = useState<Sale["clienteTodoClaro"] | "">(editing?.clienteTodoClaro || "");
+  const [tipoContrato, setTipoContrato] = useState<Sale["tipoContrato"] | "">(editing?.tipoContrato || "");
+  const [redEquipo, setRedEquipo] = useState<RedEquipo | "">(editing?.redEquipo || "");
+  const [simAdquirida, setSimAdquirida] = useState<SimAdquirida | "">(editing?.simAdquirida || "");
+  const [iccid, setIccid] = useState(editing?.iccid || "");
+
+  const [tipificacion, setTipificacion] = useState<Tipificacion | "">(editing?.tipificacion || "");
+
+  const [producto, setProducto] = useState(editing?.producto || "");
+  const [monto, setMonto] = useState(editing ? String(editing.monto) : "");
+  const [observacion, setObservacion] = useState(editing?.observacion || "");
+
+  const [msg, setMsg] = useState("");
+
+  // ======= Helpers de validación =======
+  const RX = {
+    cedula: /^\d{5,12}$/,
+    phone: /^\d{10}$/,       // <-- exactamente 10 números
+    nip: /^\d{5}$/,          // <-- exactamente 5 números
+    iccid: /^\d{12}$/,
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  };
+  const notFuture = (iso?: string) => !iso || new Date(iso) <= new Date();
+  const ageOK = (iso?: string) => {
+    if (!iso) return false;
+    const years = Math.floor((Date.now() - new Date(iso).getTime()) / (365.25 * 24 * 3600 * 1000));
+    return years >= 14;
+  };
+  const selected = (v:any) => v !== null && v !== undefined && String(v).trim() !== "";
+
+  const isPorta = tipoVenta === "PORTA_POSTPAGO" || tipoVenta === "PORTA_PREPAGO";
+  const needICCID = simAdquirida === "SI";
+  const needCFM = tipoCliente === "POSPAGO";
+
+  function canNext(): boolean {
+    if (step === 0) {
+      return selected(salaSel) && selected(fecha) && selected(origen) && selected(tipoCliente)
+        && isNonEmpty(producto) && isNonEmpty(monto) && Number(monto) > 0 && notFuture(fecha);
+    }
+    if (step === 1) {
+      return selected(tipoDocumento) && RX.cedula.test(cedula)
+        && RX.phone.test(celular) && isNonEmpty(numeroGrabacion)
+        && RX.phone.test(numeroAdicional) && RX.email.test(emailCliente);
+    }
+    if (step === 2) {
+      return isNonEmpty(cliente) && selected(fechaNacimiento) && selected(fechaExpedicion)
+        && notFuture(fechaNacimiento) && notFuture(fechaExpedicion) && ageOK(fechaNacimiento);
+    }
+    if (step === 3) {
+      return isNonEmpty(direccion) && isNonEmpty(departamento) && isNonEmpty(ciudad) && isNonEmpty(barrio);
+    }
+    if (step === 4) {
+      const baseOk = selected(tipoVenta) && selected(evaluacionIdentidad) && selected(operador);
+      if (!baseOk) return false;
+      if (isPorta) {
+        return selected(operadorDonante) && RX.phone.test(numeroAPortar) && RX.nip.test(nip);
+      }
+      return true;
+    }
+    if (step === 5) {
+      return selected(planGeneral) && isNonEmpty(planId) && isNonEmpty(idDescuentoOferta)
+        && isNonEmpty(codigoPlanAdquirir) && selected(fechaActivacion)
+        && Number(cargoFijoMensual) > 0 && (!descuentoOferta || Number(descuentoOferta) >= 0);
+    }
+    if (step === 6) {
+      const base = selected(envioLogistico) && selected(clienteTodoClaro) && selected(tipoContrato)
+        && selected(redEquipo) && selected(simAdquirida) && selected(tipificacion);
+      if (!base) return false;
+      if (needICCID && !RX.iccid.test(iccid)) return false;
+      return true;
+    }
+    return isNonEmpty(observacion);
+  }
+
+  function buildSale(): Sale {
+    return {
+      id: editing ? editing.id : `s_${Date.now()}`,
+      asesorId: user.id,
+      asesor: user.name,
+      sala: salaSel,
+      fecha,
+
+      cliente: cliente.trim(),
+      tipoDocumento: tipoDocumento as any,
+      cedula: cedula.trim(),
+      celular: celular.trim(),
+      numeroGrabacion: numeroGrabacion.trim(),
+      numeroAdicional: numeroAdicional.trim(),
+      emailCliente: emailCliente.trim(),
+
+      fechaNacimiento,
+      fechaExpedicion,
+
+      origen: origen as any,
+      ciudad: ciudad.trim(),
+      direccion: direccion.trim(),
+      departamento: departamento.trim(),
+      barrio: barrio.trim(),
+      vereda: vereda.trim(),
+      recorrido: recorrido.trim(),
+
+      tipoVenta: tipoVenta as any,
+      evaluacionIdentidad: evaluacionIdentidad as any,
+      operador: operador,
+      operadorDonante: (operadorDonante || undefined) as any,
+      numeroAPortar: numeroAPortar.trim(),
+      nip: nip.trim(),
+
+      planGeneral: planGeneral as any,
+      planId: planId.trim(),
+      idDescuentoOferta: idDescuentoOferta.trim(),
+      descuentoOferta: descuentoOferta ? Number(descuentoOferta) : undefined,
+      codigoPlanAdquirir: codigoPlanAdquirir.trim(),
+      fechaActivacion,
+      cargoFijoMensual: Number(cargoFijoMensual),
+
+      envioLogistico: envioLogistico as any,
+      clienteTodoClaro: clienteTodoClaro as any,
+      tipoContrato: tipoContrato as any,
+      redEquipo: redEquipo as any,
+      simAdquirida: simAdquirida as any,
+      iccid: iccid.trim(),
+
+      tipificacion: tipificacion as any,
+      tipoCliente: tipoCliente as any,
+
+      producto: producto.trim(),
+      tipo: deriveTipoFrom(tipoVenta as any),
+      monto: Number(monto||0),
+      estado: "PENDIENTE",
+      observacion: observacion.trim(),
+      obsHist: editing?.obsHist || [],
+    };
+  }
+
+  const submit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!canNext()) {
+      setMsg("Revisa los campos: todos son obligatorios y sin espacios en blanco (números exactos donde aplica).");
+      return;
+    }
+    const sale = buildSale();
+    if (editing) {
+      onUpdate(sale); setMsg("Corrección enviada (PENDIENTE).");
+    } else {
+      onAdd(sale); setMsg("Venta enviada (PENDIENTE).");
+    }
+    onClose();
+  };
+
+  const todayISO = new Date().toISOString().slice(0,10);
+
+  return (
+    <Modal title={editing ? "Corregir venta" : "Registrar venta"} onClose={onClose} maxWidth={980}>
+      <Stepper steps={steps} current={step} />
+
+      {/* ===== Paso 0: básicos ===== */}
+      {step===0 && (
+        <div className="space-y-3">
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Sala *</label>
+              <select className="select" value={salaSel} onChange={(e) => setSalaSel(e.target.value)}>
+                <option value="">Seleccionar</option>
+                {SALAS.map((s) => <option key={s} value={s}>Sala {s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Fecha *</label>
+              <input type="date" className="input" value={fecha} onChange={(e) => setFecha(e.target.value)} max={todayISO} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Origen *</label>
+              <select className="select" value={origen} onChange={(e)=>setOrigen(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {ORIGEN_OPTS.map(o=><option key={o} value={o}>{o.replace("_"," ")}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Tipo de cliente *</label>
+              <select className="select" value={tipoCliente} onChange={(e)=>setTipoCliente(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {TIPO_CLIENTE_OPTS.map(o=><option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </FieldRow>
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Producto *</label>
+              <input className="input" value={producto} onChange={(e) => setProducto(e.target.value)} placeholder="Plan, servicio…" />
+            </div>
+            <div>
+              <label className="label">Monto *</label>
+              <input inputMode="numeric" className="input" value={monto} onChange={(e) => setMonto(digits(e.target.value, 9))} placeholder="0" />
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 1: documento / contacto ===== */}
+      {step===1 && (
+        <div className="space-y-3">
+          <FieldRow cols={3}>
+            <div>
+              <label className="label">Tipo de documento *</label>
+              <select className="select" value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {DOC_TYPES.map((t) => <option key={t} value={t}>{t.replace("_"," ")}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Cédula *</label>
+              <input inputMode="numeric" className="input" value={cedula} onChange={(e) => setCedula(digits(e.target.value, 12))} placeholder="Sólo números" />
+            </div>
+            <div>
+              <label className="label">Celular (10 dígitos) *</label>
+              <input inputMode="numeric" className="input" value={celular} onChange={(e) => setCelular(digits(e.target.value, 10))} placeholder="XXXXXXXXXX" />
+            </div>
+          </FieldRow>
+          <FieldRow cols={3}>
+            <div>
+              <label className="label">Número de grabación *</label>
+              <input className="input" value={numeroGrabacion} onChange={(e) => setNumeroGrabacion(e.target.value)} placeholder="ID de audio / radicado" />
+            </div>
+            <div>
+              <label className="label">Email *</label>
+              <input className="input" value={emailCliente} onChange={(e)=>setEmailCliente(e.target.value)} placeholder="cliente@correo.com" />
+            </div>
+            <div>
+              <label className="label">Número adicional (10 dígitos) *</label>
+              <input inputMode="numeric" className="input" value={numeroAdicional} onChange={(e) => setNumeroAdicional(digits(e.target.value, 10))} placeholder="XXXXXXXXXX" />
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 2: cliente ===== */}
+      {step===2 && (
+        <div className="space-y-3">
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Nombre del cliente *</label>
+              <input className="input" value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Nombre y apellidos" />
+            </div>
+            <div>
+              <label className="label">Fecha de nacimiento *</label>
+              <input type="date" className="input" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} max={todayISO} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">Fecha de expedición *</label>
+              <input type="date" className="input" value={fechaExpedicion} onChange={(e) => setFechaExpedicion(e.target.value)} max={todayISO} />
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 3: dirección ===== */}
+      {step===3 && (
+        <div className="space-y-3">
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Dirección *</label>
+              <input className="input" value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Calle, número, apto" />
+            </div>
+            <div>
+              <label className="label">Departamento *</label>
+              <input className="input" value={departamento} onChange={(e) => setDepartamento(e.target.value)} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Ciudad *</label>
+              <input className="input" value={ciudad} onChange={(e)=>setCiudad(e.target.value)} placeholder="Ej.: Bogotá" />
+            </div>
+            <div>
+              <label className="label">Barrio *</label>
+              <input className="input" value={barrio} onChange={(e) => setBarrio(e.target.value)} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">Vereda</label>
+              <input className="input" value={vereda} onChange={(e) => setVereda(e.target.value)} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">Recorrido / Nota</label>
+              <textarea className="input" style={{minHeight: 90}} value={recorrido} onChange={(e)=>setRecorrido(e.target.value)} placeholder="Describe el recorrido o cualquier nota (opcional)"/>
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 4: venta / operadores ===== */}
+      {step===4 && (
+        <div className="space-y-3">
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Tipo de venta *</label>
+              <select className="select" value={tipoVenta} onChange={(e) => setTipoVenta(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                <option value="LINEA_NUEVA">Línea nueva</option>
+                <option value="PORTA_POSTPAGO">Portabilidad pospago</option>
+                <option value="PORTA_PREPAGO">Portabilidad prepago</option>
+                <option value="MIGRACION">Migración</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Validación de identidad *</label>
+              <select className="select" value={evaluacionIdentidad} onChange={(e) => setEvaluacionIdentidad(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {EVAL_ID.map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}
+              </select>
+            </div>
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Operador donante {isPorta ? "*" : ""}</label>
+              <select className="select" value={operadorDonante} onChange={(e) => setOperadorDonante(e.target.value as any)} disabled={!isPorta}>
+                <option value="">Seleccionar</option>
+                {DONANTE.map((d) => <option key={d} value={d}>{d.replace("_"," ")}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Operador (destino) *</label>
+              <select className="select" value={operador} onChange={(e) => setOperador(e.target.value)}>
+                <option value="">Seleccionar</option>
+                {(OPERADORES as readonly string[]).map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Número a portar (10) {isPorta ? "*" : ""}</label>
+              <input inputMode="numeric" className="input" value={numeroAPortar} onChange={(e) => setNumeroAPortar(digits(e.target.value, 10))} placeholder="XXXXXXXXXX" disabled={!isPorta} />
+            </div>
+            <div>
+              <label className="label">NIP (5) {isPorta ? "*" : ""}</label>
+              <input inputMode="numeric" className="input" value={nip} onChange={(e)=>setNip(digits(e.target.value, 5))} placeholder="XXXXX" disabled={!isPorta}/>
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 5: plan / oferta ===== */}
+      {step===5 && (
+        <div className="space-y-3">
+          <FieldRow cols={3}>
+            <div>
+              <label className="label">Plan general *</label>
+              <select className="select" value={planGeneral} onChange={(e) => setPlanGeneral(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                <option value="CONECTADOS">Conectado</option>
+                <option value="POWER">Power</option>
+                <option value="PREPAGO">Prepago</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">ID / Código de plan *</label>
+              <input className="input" value={planId} onChange={(e) => setPlanId(e.target.value)} placeholder="ID interno / catálogo" />
+            </div>
+            <div>
+              <label className="label">ID Descuento de la oferta *</label>
+              <input className="input" value={idDescuentoOferta} onChange={(e) => setIdDescuentoOferta(e.target.value)} placeholder="Ej.: OFF-12345" />
+            </div>
+          </FieldRow>
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Código del plan adquirido *</label>
+              <input className="input" value={codigoPlanAdquirir} onChange={(e) => setCodigoPlanAdquirir(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Fecha de activación *</label>
+              <input type="date" className="input" value={fechaActivacion} onChange={(e) => setFechaActivacion(e.target.value)} max={todayISO} />
+            </div>
+          </FieldRow>
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">CFM (Cargo Fijo Mensual) *</label>
+              <input inputMode="numeric" className="input" value={cargoFijoMensual} onChange={(e) => setCargoFijoMensual(digits(e.target.value, 7))} placeholder="0" />
+            </div>
+            <div>
+              <label className="label">Descuento (num.)</label>
+              <input inputMode="numeric" className="input" value={descuentoOferta} onChange={(e) => setDescuentoOferta(digits(e.target.value, 5))} placeholder="0" />
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 6: logística / SIM / red ===== */}
+      {step===6 && (
+        <div className="space-y-3">
+          <FieldRow cols={3}>
+            <div>
+              <label className="label">Envío logístico *</label>
+              <select className="select" value={envioLogistico} onChange={(e) => setEnvioLogistico(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                <option value="CLIENTE_COMPRA_SIM">Cliente compra SIM</option>
+                <option value="ENTREGA_LOGISTICA">Entrega logística</option>
+                <option value="MIGRACION">Migración</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Cliente Todo Claro *</label>
+              <select className="select" value={clienteTodoClaro} onChange={(e) => setClienteTodoClaro(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                <option value="SI">Sí</option>
+                <option value="NO">No</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Tipo de contrato *</label>
+              <select className="select" value={tipoContrato} onChange={(e) => setTipoContrato(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                <option value="CONTRATO_DIGITAL">Contrato digital</option>
+                <option value="CONTRATO_GRABADO">Contrato grabado</option>
+              </select>
+            </div>
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <div>
+              <label className="label">Red del equipo *</label>
+              <select className="select" value={redEquipo} onChange={(e)=>setRedEquipo(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {RED_OPTS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">SIM adquirida *</label>
+              <select className="select" value={simAdquirida} onChange={(e)=>setSimAdquirida(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {SIM_OPTS.map(s => <option key={s} value={s}>{s==="SI"?"Sí":"No"}</option>)}
+              </select>
+            </div>
+          </FieldRow>
+
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">ICCID {simAdquirida==="SI" ? "*" : ""}</label>
+              <input inputMode="numeric" className="input" value={iccid} onChange={(e)=>setIccid(digits(e.target.value, 20))} placeholder="19–20 dígitos" />
+            </div>
+          </FieldRow>
+
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">Tipificación *</label>
+              <select className="select" value={tipificacion} onChange={(e)=>setTipificacion(e.target.value as any)}>
+                <option value="">Seleccionar</option>
+                {TIPIFICACION_OPTS.map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      {/* ===== Paso 7: resumen / observación ===== */}
+      {step===7 && (
+        <div className="space-y-3">
+          <div className="note">Revisa los datos antes de enviar.</div>
+          <div className="grid-2">
+            <div>
+              <div><b>Cliente:</b> {cliente || "-"}</div>
+              <div className="note">Cédula: {cedula || "-"}</div>
+              <div className="note">Celular: {celular || "-"}</div>
+              <div className="note">Recorrido: {recorrido ? recorrido.slice(0,120) : "-"}</div>
+            </div>
+            <div>
+              <div><b>Venta:</b> {(tipoVenta||"").toString().replaceAll("_"," ")}</div>
+              <div className="note">Operador destino: {operador}</div>
+              <div className="note">Donante: {operadorDonante || "-"}</div>
+              <div className="note">Monto: {monto || 0}</div>
+            </div>
+          </div>
+          <FieldRow cols={1}>
+            <div>
+              <label className="label">Observación *</label>
+              <textarea className="input" style={{minHeight: 90}} value={observacion} onChange={(e)=>setObservacion(e.target.value)} placeholder="Comentarios relevantes…"/>
+            </div>
+          </FieldRow>
+        </div>
+      )}
+
+      <div className="modal-actions">
+        <button className="btn" onClick={()=> step>0 ? setStep(step-1) : onClose() }>{step>0? "Atrás" : "Cancelar"}</button>
+        {step<steps.length-1 ? (
+          <button className="btn primary" onClick={()=> canNext() ? setStep(step+1) : setMsg("Revisa los campos: todos son obligatorios. Marcamos “*” los del paso actual.")} disabled={!canNext()}>Siguiente</button>
+        ) : (
+          <button className="btn primary" onClick={submit}>Enviar</button>
+        )}
+      </div>
+
+      {msg && <p className="form-msg">{msg}</p>}
+    </Modal>
+  );
+}
+
+/** ================== Export / Tests ================== */
+function exportCSV(rows:Sale[]){
+  const header = ["id","fecha","asesor","sala","cliente","producto","tipo","operador","monto","estado","observacion"];
+  const mapRow = (s:Sale) => [s.id,s.fecha,s.asesor,s.sala,s.cliente,s.producto,s.tipo,s.operador,s.monto,s.estado,s.observacion||""];
+  const csv = [header, ...rows.map(mapRow)].map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv],{type:"text/csv;charset=utf-8;"}); const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href=url; a.download=`ventas_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+function buildCSV(rows:Sale[]) {
+  const header = ["id","fecha","asesor","sala","cliente","producto","tipo","operador","monto","estado","observacion"];
+  const mapRow = (s:Sale) => [s.id,s.fecha,s.asesor,s.sala,s.cliente,s.producto,s.tipo,s.operador,s.monto,s.estado,s.observacion||""];
+  return [header, ...rows.map(mapRow)].map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+}
+function updateStatusWithReason(rows:Sale[], id: string, newStatus: Estado, reason?: string) {
+  return rows.map(s => {
+    if (s.id !== id) return s;
+    if (newStatus === "RECHAZADO") {
+      const obsHist = [...(s.obsHist||[]), reason||""];
+      return { ...s, estado: newStatus, observacion: reason||"", obsHist };
+    }
+    return { ...s, estado: newStatus, observacion: newStatus==="APROBADO" ? "" : s.observacion };
+  });
+}
+function resubmitCorrection(s:Sale) { return { ...s, estado: "PENDIENTE" as Estado, observacion: "" }; }
+function lineSeriesByDate(rows:Sale[]) { const map:any={}; rows.forEach((r)=>{ const k=r.fecha; if(!map[k]) map[k]={fecha:k,PENDIENTE:0,APROBADO:0,RECHAZADO:0}; (map[k] as any)[r.estado]+=1; }); return Object.values(map).sort((a:any,b:any)=>(a as any).fecha.localeCompare((b as any).fecha)) as any[]; }
+function countByOperator(rows:Sale[]) { const m:any={}; rows.forEach((r) => m[r.operador]=(m[r.operador]||0)+1); return Object.entries(m).map(([operador,value])=>({operador,value})); }
+function applyExternalStatus(rows:Sale[], id:string, status:Estado){
+  return rows.map(s=> s.id===id ? ({...s, estado: status, observacion: status==="APROBADO"?"":s.observacion}) : s);
+}
+function TestPanel({ sales }:{ sales:Sale[]}){
+  const [results,setResults]=useState<any[]>([]);
+  const run=()=>{ const t:any[]=[];
+    (()=>{ const sample=[{id:"t1",fecha:"2025-10-01",asesor:"A",sala:"1",cliente:"C1",producto:"P1",tipo:"PORTABILIDAD",operador:"CLARO",monto:10,estado:"PENDIENTE",observacion:""}] as any;
+           const csv=buildCSV(sample as any); const okHeader=csv.split("\n")[0].includes("observacion"); t.push({name:"CSV incluye observacion",pass:okHeader,detail:csv.split("\n")[0]}); })();
+    (()=>{ const arr=[{id:"x1",estado:"PENDIENTE"}] as any; const res=updateStatusWithReason(arr as any,"x1","RECHAZADO","Doc ilegible"); const r:any=(res as any)[0]; t.push({name:"updateStatusWithReason añade motivo",pass:r.estado==="RECHAZADO"&&r.observacion==="Doc ilegible"&&(r.obsHist||[]).length===1,detail:JSON.stringify(r)}); })();
+    (()=>{ const sale:any={id:"x2",estado:"RECHAZADO",observacion:"faltan datos"}; const r=resubmitCorrection(sale as any); t.push({name:"resubmitCorrection limpia observacion y pone PENDIENTE",pass:r.estado==="PENDIENTE"&&r.observacion==="",detail:JSON.stringify(r)}); })();
+    (()=>{ const arr=[{fecha:"2025-10-02",estado:"APROBADO"},{fecha:"2025-10-01",estado:"PENDIENTE"},{fecha:"2025-10-01",estado:"APROBADO"}] as any; const serie:any=lineSeriesByDate(arr as any); const sorted=serie[0].fecha==="2025-10-01"&&serie[1].fecha==="2025-10-02"; const countsOk=serie[0].APROBADO===1&&serie[0].PENDIENTE===1&&serie[1].APROBADO===1;
+           t.push({name:"lineSeriesByDate",pass:sorted&&countsOk,detail:JSON.stringify(serie)}); })();
+    (()=>{ const arr=[{id:"ext1",estado:"PENDIENTE",observacion:"x"}] as any; const r=applyExternalStatus(arr as any,"ext1","APROBADO" as any)[0]; t.push({name:"applyExternalStatus APRUEBA y limpia observacion",pass:r.estado==="APROBADO"&&r.observacion==="",detail:JSON.stringify(r)}); })();
+    setResults(t); };
+  return (<Card header={<span style={{display:"inline-flex",alignItems:"center",gap:6}}><ClipboardList size={16}/>Pruebas automáticas</span>}>{results.length===0?<p className="note">Clic en “Ejecutar tests” para validar CSV, rechazo con observación, reenvío y verificación externa.</p>:
+    <ul style={{listStyle:"none",padding:0,margin:0,display:"grid",gap:8}}>{results.map((r:any,i:number)=>(<li key={i} style={{display:"flex",alignItems:"center",gap:8}}>{r.pass?<CheckCircle2 size={16} color="#059669"/>:<XCircle size={16} color="#e11d48"/>}
+      <span style={{fontWeight:700}}>{r.name}:</span><span style={{color:r.pass?"#065f46":"#b91c1c"}}>{r.pass?"OK":"FALLÓ"}</span><span className="note">({r.detail})</span></li>))}</ul>}
+    <div style={{marginTop:10}}><button className="btn" onClick={run}>Ejecutar tests</button></div></Card>);
+}
+
+/** ================== App ================== */
+export default function App(){
+  const [currentUser, setCurrentUser] = usePersistentState<User|null>(LS_USER, null);
+  const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, loadSales);
+  const logout = () => setCurrentUser(null);
+  return (<div>
+    <AppHeader currentUser={currentUser} onLogout={logout}/>
+    {!currentUser ? <Login onLogin={setCurrentUser}/> :
+      currentUser.role==="asesor" ? <AsesorView user={currentUser} sales={sales} setSales={(up)=>setSales(p=>up(p))}/> :
+      <BackOfficeView sales={sales} setSales={(up)=>setSales(p=>up(p))}/>
+    }
+  </div>);
+}
+
+

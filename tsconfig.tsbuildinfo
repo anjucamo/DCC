@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/appshell.tsx","./src/main.tsx","./src/hooks/useprofile.ts","./src/layouts/dashboardlayout.tsx","./src/lib/supabase.ts","./src/pages/dashboardback.tsx","./src/pages/mimeta.tsx","./src/pages/misventas.tsx","./src/pages/nuevaventa.tsx","./src/services/dashboard.ts","./src/services/metas.ts","./src/services/ventasback.ts"],"version":"5.9.3"}
