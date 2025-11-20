@@ -6,7 +6,8 @@ import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
 import { USERS } from "./data/users";
-import { loadSales, saveSales } from "./lib/sales";
+import { saveSales } from "./lib/sales";
+import { supabase } from "./lib/supabase";
 
 import "./app.css";
 
@@ -18,13 +19,39 @@ export default function App() {
     LS_USER,
     null
   );
-  const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, loadSales);
+
+  // 👉 Ya NO usamos loadSales: arrancamos vacío y cargamos desde Supabase
+  const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
+
+  // 👉 Cargar SIEMPRE las ventas desde Supabase al montar la app
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("sales")          // nombre de tu tabla en Supabase
+          .select("*")
+          .order("fecha", { ascending: false });
+
+        if (error) {
+          console.error("Error cargando ventas desde Supabase:", error);
+          return;
+        }
+
+        if (data) {
+          setSales(data as Sale[]);
+        }
+      } catch (e) {
+        console.error("Error inesperado cargando ventas:", e);
+      }
+    })();
+  }, [setSales]);
 
   const logout = () => setCurrentUser(null);
 
   return (
     <div>
       {currentUser && <AppHeader currentUser={currentUser} onLogout={logout} />}
+
       {!currentUser ? (
         <LoginEnhanced onLogin={setCurrentUser} />
       ) : currentUser.role === "asesor" ? (
