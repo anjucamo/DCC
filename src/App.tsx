@@ -6,8 +6,7 @@ import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
 import { USERS } from "./data/users";
-import { saveSales } from "./lib/sales";
-import { supabase } from "./lib/supabase";
+import { fetchSalesFromSupabase, saveSales } from "./lib/sales";
 
 import "./app.css";
 
@@ -20,26 +19,24 @@ export default function App() {
     null
   );
 
+  // Arrancamos con lo que haya en localStorage (por si no hay internet)
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
+  // Cargar SIEMPRE las ventas desde Supabase al montar la app
   React.useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from("ventas") // ⬅️ PON AQUÍ EL NOMBRE REAL DE LA TABLA
-          .select("*")
-          .order("created_at", { ascending: false }); // ⬅️ O "fecha" si esa es tu columna
+        const remoteSales = await fetchSalesFromSupabase();
 
-        if (error) {
-          console.error("Error cargando ventas desde Supabase:", error);
-          return;
-        }
+        console.log("Ventas cargadas desde Supabase:", remoteSales.length);
 
-        if (data) {
-          setSales(data as Sale[]);
+        // Si Supabase devolvió algo, sobreescribimos el estado local
+        if (remoteSales.length > 0) {
+          setSales(remoteSales);
+          saveSales(remoteSales); // actualizamos cache localStorage
         }
       } catch (e) {
-        console.error("Error inesperado cargando ventas:", e);
+        console.error("Error cargando ventas desde Supabase:", e);
       }
     })();
   }, [setSales]);
