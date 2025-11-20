@@ -64,7 +64,7 @@ export function NuevaVenta() {
       observacion: form.observacion || null,
     };
 
-    const { error } = await supabase.from('sales').insert(payload);
+    const { error } = await supabase.from('ventas').insert(payload);
 
     if (error) {
       console.error(error);
