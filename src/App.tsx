@@ -22,13 +22,13 @@ export default function App() {
 
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
-  // 🔥 NUEVO: leer directamente de public.ventas (sin usar crudo)
+  // Leer SIEMPRE las ventas desde Supabase y mapear a Sale
   React.useEffect(() => {
-    (async () => {
+    const fetchSales = async () => {
       try {
         const { data, error } = await supabase
-          .from("ventas")                // tabla real
-          .select("*")                   // todas las columnas
+          .from("ventas")
+          .select("*")
           .order("fecha", { ascending: false });
 
         if (error) {
@@ -37,16 +37,31 @@ export default function App() {
         }
 
         console.log("Ventas desde Supabase:", data);
-
         const remoteSales = (data ?? []) as Sale[];
-
-        // pisamos siempre el estado local con lo que venga de Supabase
         setSales(remoteSales);
-        saveSales(remoteSales);
+        // NOTE: saveSales no es necesario aquí si setSales ya persiste en localStorage
       } catch (e) {
         console.error("Error inesperado cargando ventas:", e);
       }
-    })();
+    };
+
+    fetchSales(); // Carga inicial
+
+    const channel = supabase
+      .channel('realtime-ventas')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ventas' },
+        (payload) => {
+          console.log('Cambio detectado en ventas:', payload);
+          fetchSales(); // Recargar ventas cuando hay un cambio
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel); // Limpiar la suscripción
+    };
   }, [setSales]);
 
   const logout = () => setCurrentUser(null);

@@ -29,10 +29,11 @@ export async function saveSaleInSupabase(sale: Sale) {
     if (error) {
       console.error("Error guardando venta en Supabase:", error);
     }
-  } catch (err) {
-    console.error("Error inesperado guardando venta en Supabase:", err);
+  } catch (e) {
+    console.error("Error inesperado guardando venta en Supabase:", e);
   }
 }
+
 
 /**
  * Lee TODAS las ventas desde Supabase y reconstruye el tipo Sale
