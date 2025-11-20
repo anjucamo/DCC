@@ -22,13 +22,13 @@ export default function App() {
 
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
-  // Cargar SIEMPRE las ventas desde Supabase al montar la app
+  // 🔥 NUEVO: leer directamente de public.ventas (sin usar crudo)
   React.useEffect(() => {
     (async () => {
       try {
         const { data, error } = await supabase
-          .from("ventas")                // 👈 tu tabla real
-          .select("crudo, fecha")        // leemos el json `crudo`
+          .from("ventas")                // tabla real
+          .select("*")                   // todas las columnas
           .order("fecha", { ascending: false });
 
         if (error) {
@@ -36,14 +36,11 @@ export default function App() {
           return;
         }
 
-        // data es un array de filas con { crudo, fecha }
-        const remoteSales: Sale[] = (data || [])
-          .map((row: any) => row.crudo as Sale)
-          .filter((s) => !!s && !!s.id);
+        console.log("Ventas desde Supabase:", data);
 
-        console.log("Ventas desde Supabase:", remoteSales);
+        const remoteSales = (data ?? []) as Sale[];
 
-        // SIEMPRE pisamos el estado local con lo que venga de Supabase (aunque esté vacío)
+        // pisamos siempre el estado local con lo que venga de Supabase
         setSales(remoteSales);
         saveSales(remoteSales);
       } catch (e) {
