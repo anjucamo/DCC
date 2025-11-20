@@ -1,4 +1,4 @@
-import React from "react";
+
 import { usePersistentState } from "./hooks/usePersistentState";
 import { Sale, User } from "./types";
 import { LoginEnhanced } from "./pages/LoginEnhanced";
@@ -6,10 +6,10 @@ import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
 import { USERS } from "./data/users";
-import { saveSales } from "./lib/sales";
 import { supabase } from "./lib/supabase";
-
+import { loadSales, saveSales, fetchSalesFromSupabase } from "./lib/sales";
 import "./app.css";
+import React, { useEffect } from "react";
 
 const LS_USER = "dcc_user_v1";
 const LS_SALES = "dcc_sales_v2";
@@ -19,9 +19,20 @@ export default function App() {
     LS_USER,
     null
   );
-
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
+useEffect(() => {
+    if (!currentUser) return;
 
+    (async () => {
+      const remoteSales = await fetchSalesFromSupabase();
+
+      // Sobrescribimos el estado local con lo que viene de Supabase
+      setSales(() => remoteSales);
+
+      // Y actualizamos también el localStorage para caché
+      saveSales(remoteSales);
+    })();
+  }, [currentUser]);
   // Efecto para cargar las ventas y suscribirse a cambios.
   // Se ejecuta solo cuando `currentUser` cambia y no es nulo.
   React.useEffect(() => {
