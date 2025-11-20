@@ -2,7 +2,7 @@
 import React from "react";
 import { supabase } from "../lib/supabase";
 import { User } from "../types";
-import logo from "../assets/logo.png";
+
 import logo3 from "../assets/logo3.png";
 
 
@@ -76,7 +76,7 @@ export function LoginEnhanced({ onLogin }: { onLogin: (u: User) => void }) {
       {/* Columna derecha (logo + formulario, como antes) */}
       <div className="auth-right">
         <div className="auth-logo">
-          <img src={logo} alt="Digital Contact Center Colombia" />
+          
         </div>
 
         <h1 className="auth-title">Bienvenido de nuevo</h1>
