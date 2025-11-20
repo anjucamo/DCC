@@ -99,13 +99,7 @@ export function AsesorView({
       <div className="row auto-3">
         {isEmpty && (
           <div className="empty-sales">
-            <img
-              src="/img/empty-sales.svg"
-              alt="Sin ventas"
-              onError={(e: any) => {
-                e.currentTarget.style.display = "none";
-              }}
-            />
+         
             <h3>Aún no tienes ventas</h3>
             <p>
               Registra tu primera venta con el botón <b>“Registrar venta”</b>.
