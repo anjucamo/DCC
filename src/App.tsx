@@ -1,18 +1,15 @@
-// src/App.tsx
-import React, { useEffect } from "react";
+
 import { usePersistentState } from "./hooks/usePersistentState";
 import { Sale, User } from "./types";
-
 import { LoginEnhanced } from "./pages/LoginEnhanced";
 import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
 import { USERS } from "./data/users";
-
 import { supabase } from "./lib/supabase";
-import { saveSales, fetchSalesFromSupabase } from "./lib/sales";
-
+import { loadSales, saveSales, fetchSalesFromSupabase } from "./lib/sales";
 import "./app.css";
+import React, { useEffect } from "react";
 
 const LS_USER = "dcc_user_v1";
 const LS_SALES = "dcc_sales_v2";
@@ -22,59 +19,74 @@ export default function App() {
     LS_USER,
     null
   );
-
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
+useEffect(() => {
+    if (!currentUser) return;
 
-  /**
-   * Cargar ventas desde Supabase y suscribirse a cambios en tiempo real.
-   * Se ejecuta cada vez que cambia `currentUser`.
-   */
-  useEffect(() => {
+    (async () => {
+      const remoteSales = await fetchSalesFromSupabase();
+
+      // Sobrescribimos el estado local con lo que viene de Supabase
+      setSales(() => remoteSales);
+
+      // Y actualizamos también el localStorage para caché
+      saveSales(remoteSales);
+    })();
+  }, [currentUser]);
+  // Efecto para cargar las ventas y suscribirse a cambios.
+  // Se ejecuta solo cuando `currentUser` cambia y no es nulo.
+  React.useEffect(() => {
+    // No hacer nada si no hay un usuario logueado.
     if (!currentUser) {
-      // Si no hay usuario, limpiamos ventas y salimos
-      setSales([]);
-      saveSales([]);
+      setSales([]); // Opcional: limpiar las ventas al desloguear.
       return;
     }
 
-    const fetchRemoteSales = async () => {
+    const fetchSales = async () => {
       try {
-        const remoteSales = await fetchSalesFromSupabase();
+        const { data, error, status } = await supabase
+          .from("ventas")
+          .select("*")
+          .order("fecha", { ascending: false });
+
+        if (error) {
+          console.error("Error cargando ventas desde Supabase:", error, "Status:", status);
+          // Si el error es por RLS o auth, podría ser señal de una sesión inválida.
+          if (error.code === 'PGRST301' || status === 401) {
+             console.log("Sesión inválida detectada, deslogueando.");
+             setCurrentUser(null);
+          }
+          return;
+        }
+
+        console.log("Ventas desde Supabase:", data);
+        const remoteSales = (data ?? []) as Sale[];
         setSales(remoteSales);
-        saveSales(remoteSales);
-        console.log("Ventas cargadas desde Supabase:", remoteSales);
       } catch (e) {
-        console.error("Error cargando ventas (fetchRemoteSales):", e);
+        console.error("Error inesperado cargando ventas:", e);
       }
     };
 
-    // Carga inicial
-    fetchRemoteSales();
+    fetchSales(); // Carga inicial porque ya sabemos que hay un usuario.
 
-    // Suscripción a cambios en la tabla ventas
     const channel = supabase
-      .channel("realtime-ventas")
+      .channel('realtime-ventas')
       .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "ventas" },
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ventas' },
         (payload) => {
-          console.log("Cambio detectado en ventas, recargando...", payload);
-          fetchRemoteSales();
+          console.log('Cambio detectado en ventas, recargando...');
+          fetchSales(); // Recargar ventas cuando hay un cambio.
         }
       )
       .subscribe();
 
-    // Cleanup: quitar suscripción cuando cambia el usuario o se desmonta
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel); // Limpiar la suscripción.
     };
-  }, [currentUser, setSales]);
+  }, [currentUser, setSales, setCurrentUser]);
 
-  const logout = () => {
-    setCurrentUser(null);
-    setSales([]);
-    saveSales([]);
-  };
+  const logout = () => setCurrentUser(null);
 
   return (
     <div>
