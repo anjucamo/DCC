@@ -22,30 +22,41 @@ export default function App() {
 
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
-  // Leer SIEMPRE las ventas desde Supabase y mapear a Sale
+  // Efecto para cargar las ventas y suscribirse a cambios.
+  // Se ejecuta solo cuando `currentUser` cambia y no es nulo.
   React.useEffect(() => {
+    // No hacer nada si no hay un usuario logueado.
+    if (!currentUser) {
+      setSales([]); // Opcional: limpiar las ventas al desloguear.
+      return;
+    }
+
     const fetchSales = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error, status } = await supabase
           .from("ventas")
           .select("*")
           .order("fecha", { ascending: false });
 
         if (error) {
-          console.error("Error cargando ventas desde Supabase:", error);
+          console.error("Error cargando ventas desde Supabase:", error, "Status:", status);
+          // Si el error es por RLS o auth, podría ser señal de una sesión inválida.
+          if (error.code === 'PGRST301' || status === 401) {
+             console.log("Sesión inválida detectada, deslogueando.");
+             setCurrentUser(null);
+          }
           return;
         }
 
         console.log("Ventas desde Supabase:", data);
         const remoteSales = (data ?? []) as Sale[];
         setSales(remoteSales);
-        // NOTE: saveSales no es necesario aquí si setSales ya persiste en localStorage
       } catch (e) {
         console.error("Error inesperado cargando ventas:", e);
       }
     };
 
-    fetchSales(); // Carga inicial
+    fetchSales(); // Carga inicial porque ya sabemos que hay un usuario.
 
     const channel = supabase
       .channel('realtime-ventas')
@@ -53,16 +64,16 @@ export default function App() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ventas' },
         (payload) => {
-          console.log('Cambio detectado en ventas:', payload);
-          fetchSales(); // Recargar ventas cuando hay un cambio
+          console.log('Cambio detectado en ventas, recargando...');
+          fetchSales(); // Recargar ventas cuando hay un cambio.
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel); // Limpiar la suscripción
+      supabase.removeChannel(channel); // Limpiar la suscripción.
     };
-  }, [setSales]);
+  }, [currentUser, setSales, setCurrentUser]);
 
   const logout = () => setCurrentUser(null);
 
