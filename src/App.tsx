@@ -6,7 +6,8 @@ import { AppHeader } from "./components/AppHeader";
 import { AsesorView } from "./pages/AsesorView";
 import { BackOfficeView } from "./pages/BackOfficeView";
 import { USERS } from "./data/users";
-import { fetchSalesFromSupabase, saveSales } from "./lib/sales";
+import { saveSales } from "./lib/sales";
+import { supabase } from "./lib/supabase";
 
 import "./app.css";
 
@@ -19,24 +20,34 @@ export default function App() {
     null
   );
 
-  // Arrancamos con lo que haya en localStorage (por si no hay internet)
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
   // Cargar SIEMPRE las ventas desde Supabase al montar la app
   React.useEffect(() => {
     (async () => {
       try {
-        const remoteSales = await fetchSalesFromSupabase();
+        const { data, error } = await supabase
+          .from("ventas")                // 👈 tu tabla real
+          .select("crudo, fecha")        // leemos el json `crudo`
+          .order("fecha", { ascending: false });
 
-        console.log("Ventas cargadas desde Supabase:", remoteSales.length);
-
-        // Si Supabase devolvió algo, sobreescribimos el estado local
-        if (remoteSales.length > 0) {
-          setSales(remoteSales);
-          saveSales(remoteSales); // actualizamos cache localStorage
+        if (error) {
+          console.error("Error cargando ventas desde Supabase:", error);
+          return;
         }
+
+        // data es un array de filas con { crudo, fecha }
+        const remoteSales: Sale[] = (data || [])
+          .map((row: any) => row.crudo as Sale)
+          .filter((s) => !!s && !!s.id);
+
+        console.log("Ventas desde Supabase:", remoteSales);
+
+        // SIEMPRE pisamos el estado local con lo que venga de Supabase (aunque esté vacío)
+        setSales(remoteSales);
+        saveSales(remoteSales);
       } catch (e) {
-        console.error("Error cargando ventas desde Supabase:", e);
+        console.error("Error inesperado cargando ventas:", e);
       }
     })();
   }, [setSales]);
