@@ -20,17 +20,15 @@ export default function App() {
     null
   );
 
-  // 👉 Ya NO usamos loadSales: arrancamos vacío y cargamos desde Supabase
   const [sales, setSales] = usePersistentState<Sale[]>(LS_SALES, []);
 
-  // 👉 Cargar SIEMPRE las ventas desde Supabase al montar la app
   React.useEffect(() => {
     (async () => {
       try {
         const { data, error } = await supabase
-          .from("sales")          // nombre de tu tabla en Supabase
+          .from("ventas") // ⬅️ PON AQUÍ EL NOMBRE REAL DE LA TABLA
           .select("*")
-          .order("fecha", { ascending: false });
+          .order("created_at", { ascending: false }); // ⬅️ O "fecha" si esa es tu columna
 
         if (error) {
           console.error("Error cargando ventas desde Supabase:", error);
