@@ -39,11 +39,16 @@ export async function saveSaleInSupabase(sale: Sale) {
  * Lee TODAS las ventas desde Supabase y reconstruye el tipo Sale
  * usando la columna crudo (jsonb).
  */
+/**
+ * Lee TODAS las ventas desde Supabase y reconstruye el tipo Sale
+ * usando la columna crudo (jsonb), pero SOBREESCRIBE el estado
+ * con la columna `estado` real de la tabla.
+ */
 export async function fetchSalesFromSupabase(): Promise<Sale[]> {
   try {
     const { data, error } = await supabase
       .from("ventas")
-      .select("crudo, fecha")
+      .select("crudo, fecha, estado")
       .order("fecha", { ascending: false });
 
     if (error) {
@@ -53,10 +58,20 @@ export async function fetchSalesFromSupabase(): Promise<Sale[]> {
 
     if (!data) return [];
 
-    // Cada fila trae crudo: { ...sale }
     const sales: Sale[] = data
-      .map((row: any) => row.crudo as Sale)
-      .filter((s) => !!s && !!s.id); // por si hay filas antiguas sin crudo
+      .map((row: any) => {
+        const sale = row.crudo as Sale | null;
+
+        if (!sale || !sale.id) return null;
+
+        // Si la fila trae `estado` en la tabla, pisamos el del JSON.
+        if (row.estado) {
+          sale.estado = row.estado;
+        }
+
+        return sale;
+      })
+      .filter((s): s is Sale => !!s);
 
     return sales;
   } catch (err) {
@@ -64,6 +79,7 @@ export async function fetchSalesFromSupabase(): Promise<Sale[]> {
     return [];
   }
 }
+
 
 /**
  * LocalStorage: lo puedes seguir usando como caché.
