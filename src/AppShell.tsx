@@ -28,7 +28,7 @@ export default function AppShell({
       <header className="app-header">
         <div className="header-grid container">
           <div className="brand">
-            <img src="/dcc-logo.png" alt="DCC" />
+          
             <span>DCC</span>
             <div className="dots" aria-hidden>
               <span className="dot y"></span>
