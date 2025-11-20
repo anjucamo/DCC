@@ -17,10 +17,10 @@ export function MisVentas() {
   const [filtroEstado, setFiltroEstado] = useState('TODOS');
 
   useEffect(() => {
-    const fetchVentas = async () => {
+    (async () => {
       setLoading(true);
       let query = supabase
-        .from('ventas')
+        .from('sales')
         .select('id, fecha, cliente, producto, monto, estado')
         .order('fecha', { ascending: false });
 
@@ -32,25 +32,7 @@ export function MisVentas() {
 
       if (!error && data) setVentas(data);
       setLoading(false);
-    };
-
-    fetchVentas(); // Carga inicial
-
-    const channel = supabase
-      .channel('realtime-mis-ventas')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'sales' },
-        (payload) => {
-          console.log('Cambio detectado en mis ventas:', payload);
-          fetchVentas(); // Recargar ventas cuando hay un cambio
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel); // Limpiar la suscripción
-    };
+    })();
   }, [filtroEstado]);
 
   return (

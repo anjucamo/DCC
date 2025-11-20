@@ -2,7 +2,7 @@
 import React from "react";
 import { supabase } from "../lib/supabase";
 import { User } from "../types";
-
+import logo from "../assets/logo.png";
 
 export function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [cedula, setCedula] = React.useState("");
@@ -48,7 +48,7 @@ export function Login({ onLogin }: { onLogin: (u: User) => void }) {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          
+          <img src={logo} alt="DCC" className="auth-logo" />
           <h2>Bienvenido de nuevo</h2>
           <p>Ingresa tus credenciales para continuar</p>
         </div>

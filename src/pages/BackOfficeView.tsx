@@ -1,3 +1,4 @@
+
 import { useMemo, useState } from "react";
 import { Filter } from "lucide-react";
 import { Sale, User, Estado } from "../types";
@@ -11,8 +12,6 @@ import { InformePrincipal } from "../components/informes/InformePrincipal";
 import { InformeGeneral } from "../components/informes/InformeGeneral";
 import { InformeSalas } from "../components/informes/InformeSalas";
 import { TestPanel } from "../components/TestPanel";
-import { saveSaleInSupabase } from "../lib/sales";
-
 
 function exportCSV(rows: Sale[]) {
   const header = [
@@ -110,75 +109,49 @@ export function BackOfficeView({
   );
 
   const setStatus = (id: string, st: Estado) => {
-  if (st === "RECHAZADO") {
-    setRejectingId(id);
+    if (st === "RECHAZADO") {
+      setRejectingId(id);
+      setRejectReason("");
+      return;
+    }
+    setSales((prev) => {
+      const next: Sale[] = prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              estado: st,
+              observacion: st === "APROBADO" ? "" : s.observacion,
+            }
+          : s
+      );
+      saveSales(next);
+      return next;
+    });
+  };
+
+  const confirmReject = () => {
+    if (!rejectingId || !rejectReason) return;
+    const reason = rejectReason.trim();
+    setSales((prev) => {
+      const next: Sale[] = prev.map((s) =>
+        s.id === rejectingId
+          ? {
+              ...s,
+              estado: "RECHAZADO",
+              observacion: reason,
+              obsHist: [
+                ...(s.obsHist || []),
+                `[${new Date().toLocaleString()}] ${reason}`,
+              ],
+            }
+          : s
+      );
+      saveSales(next);
+      return next;
+    });
+    setRejectingId(null);
     setRejectReason("");
-    return;
-  }
-
-  let updated: Sale | null = null;
-
-  setSales((prev) => {
-    const next: Sale[] = prev.map((s) => {
-      if (s.id !== id) return s;
-
-      const updatedSale: Sale = {
-        ...s,
-        estado: st,
-        observacion: st === "APROBADO" ? "" : s.observacion,
-      };
-
-      updated = updatedSale;
-      return updatedSale;
-    });
-
-    saveSales(next);
-    return next;
-  });
-
-  // Enviar el cambio también a Supabase (tabla ventas)
-  if (updated) {
-    saveSaleInSupabase(updated);
-  }
-};
-
-
-const confirmReject = () => {
-  if (!rejectingId || !rejectReason) return;
-  const reason = rejectReason.trim();
-
-  let updated: Sale | null = null;
-
-  setSales((prev) => {
-    const next: Sale[] = prev.map((s) => {
-      if (s.id !== rejectingId) return s;
-
-      const updatedSale: Sale = {
-        ...s,
-        estado: "RECHAZADO",
-        observacion: reason,
-        obsHist: [
-          ...(s.obsHist || []),
-          `[${new Date().toLocaleString()}] ${reason}`,
-        ],
-      };
-
-      updated = updatedSale;
-      return updatedSale;
-    });
-
-    saveSales(next);
-    return next;
-  });
-
-  if (updated) {
-    saveSaleInSupabase(updated);
-  }
-
-  setRejectingId(null);
-  setRejectReason("");
-};
-
+  };
   const cancelReject = () => {
     setRejectingId(null);
     setRejectReason("");
