@@ -17,6 +17,7 @@ export async function saveSaleInSupabase(sale: Sale) {
       sala: sale.sala,
       fecha: sale.fecha,              // "YYYY-MM-DD"
       cliente: sale.cliente,
+      // Usa el número de grabación como numero_aportar en BD
       numero_aportar: sale.numeroGrabacion ?? null,
       cedula: sale.cedula ?? null,
       estado: sale.estado,
@@ -33,7 +34,6 @@ export async function saveSaleInSupabase(sale: Sale) {
     console.error("Error inesperado guardando venta en Supabase:", e);
   }
 }
-
 
 /**
  * Lee TODAS las ventas desde Supabase y reconstruye el tipo Sale
