@@ -99,7 +99,6 @@ export function AsesorView({
       <div className="row auto-3">
         {isEmpty && (
           <div className="empty-sales">
-
             <h3>Aún no tienes ventas</h3>
             <p>
               Registra tu primera venta con el botón <b>“Registrar venta”</b>.
